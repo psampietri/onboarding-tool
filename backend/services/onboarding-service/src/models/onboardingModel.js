@@ -1,0 +1,54 @@
+import pool from 'database';
+
+export const createOnboardingInstance = async (userId, templateId, assignedBy) => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        const instanceRes = await client.query(
+            'INSERT INTO onboarding_instances (user_id, onboarding_template_id, assigned_by) VALUES ($1, $2, $3) RETURNING *',
+            [userId, templateId, assignedBy]
+        );
+        const instance = instanceRes.rows[0];
+
+        const tasksRes = await client.query(
+            'SELECT task_template_id FROM onboarding_template_tasks WHERE onboarding_template_id = $1',
+            [templateId]
+        );
+
+        for (const task of tasksRes.rows) {
+            await client.query(
+                'INSERT INTO task_instances (onboarding_instance_id, task_template_id) VALUES ($1, $2)',
+                [instance.id, task.task_template_id]
+            );
+        }
+
+        await client.query('COMMIT');
+        return instance;
+    } catch (e) {
+        await client.query('ROLLBACK');
+        throw e;
+    } finally {
+        client.release();
+    }
+};
+
+export const findTasksByUserId = async (userId) => {
+    const { rows } = await pool.query(
+        `SELECT ti.*, tt.name, tt.description, tt.task_type
+         FROM task_instances ti
+         JOIN onboarding_instances oi ON ti.onboarding_instance_id = oi.id
+         JOIN task_templates tt ON ti.task_template_id = tt.id
+         WHERE oi.user_id = $1 AND oi.status != 'completed'`,
+        [userId]
+    );
+    return rows;
+};
+
+export const updateTaskInstance = async (taskId, status, ticketInfo) => {
+    const { rows } = await pool.query(
+        'UPDATE task_instances SET status = $1, ticket_info = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 RETURNING *',
+        [status, ticketInfo, taskId]
+    );
+    return rows[0];
+};
