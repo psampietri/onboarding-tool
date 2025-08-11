@@ -3,19 +3,21 @@ import {
     Container, Typography, Paper, TableContainer, Table, TableHead,
     TableRow, TableCell, TableBody, CircularProgress, Box, Alert, Button,
     Modal, TextField, FormControl, InputLabel, Select, MenuItem, IconButton,
-    List, ListItem, ListItemText, Checkbox, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle
+    List, ListItem, ListItemText, Checkbox, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Grid
 } from '@mui/material';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import api from '../../services/api';
+import { getServiceDesks, getRequestTypes, getRequestTypeFields } from '../../services/integrationService';
+import { getUserFields } from '../../services/userService';
 
 const style = {
     position: 'absolute',
     top: '50%',
     left: '50%',
     transform: 'translate(-50%, -50%)',
-    width: 500,
+    width: 600,
     bgcolor: 'background.paper',
     border: '2px solid #000',
     boxShadow: 24,
@@ -201,15 +203,85 @@ const TaskTemplates = ({ taskTemplates, fetchTaskTemplates }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [currentTemplate, setCurrentTemplate] = useState(null);
 
+    // State for Jira integration
+    const [serviceDesks, setServiceDesks] = useState([]);
+    const [requestTypes, setRequestTypes] = useState([]);
+    const [jiraFields, setJiraFields] = useState([]);
+    const [selectedServiceDesk, setSelectedServiceDesk] = useState('');
+    const [selectedRequestType, setSelectedRequestType] = useState('');
+    const [userFields, setUserFields] = useState([]);
+    const [fieldMappings, setFieldMappings] = useState({});
+
+    // Fetch user fields once
+    useEffect(() => {
+        const fetchUserFields = async () => {
+            try {
+                const fields = await getUserFields();
+                setUserFields(fields);
+            } catch (err) {
+                setError('Failed to fetch user fields.');
+            }
+        };
+        fetchUserFields();
+    }, []);
+
+    useEffect(() => {
+        if (currentTemplate?.task_type === 'automated_access_request') {
+            const fetchDesks = async () => {
+                try {
+                    const desks = await getServiceDesks('jira', 'MSI');
+                    setServiceDesks(desks.values);
+                } catch (err) {
+                    setError('Failed to fetch service desks.');
+                }
+            };
+            fetchDesks();
+        }
+    }, [currentTemplate?.task_type]);
+
+    useEffect(() => {
+        if (selectedServiceDesk) {
+            const fetchRequestTypes = async () => {
+                try {
+                    const types = await getRequestTypes('jira', 'MSI', selectedServiceDesk);
+                    setRequestTypes(types.values);
+                } catch (err) {
+                    setError('Failed to fetch request types.');
+                }
+            };
+            fetchRequestTypes();
+        }
+    }, [selectedServiceDesk]);
+    
+    useEffect(() => {
+        if (selectedRequestType) {
+            const fetchFields = async () => {
+                try {
+                    const fieldsData = await getRequestTypeFields('jira', 'MSI', selectedServiceDesk, selectedRequestType);
+                    setJiraFields(fieldsData.requestTypeFields);
+                } catch (err) {
+                    setError('Failed to fetch request type fields.');
+                }
+            };
+            fetchFields();
+        }
+    }, [selectedRequestType]);
+
+
     const handleOpenCreateModal = () => {
         setIsEditing(false);
         setCurrentTemplate({ name: '', description: '', task_type: 'manual', config: '{}' });
+        setSelectedServiceDesk('');
+        setSelectedRequestType('');
+        setJiraFields([]);
+        setFieldMappings({});
         setModalOpen(true);
     };
 
     const handleOpenEditModal = (template) => {
         setIsEditing(true);
         setCurrentTemplate({ ...template, config: JSON.stringify(template.config || {}, null, 2) });
+        // Logic to pre-fill selections for editing would go here
         setModalOpen(true);
     };
 
@@ -226,15 +298,31 @@ const TaskTemplates = ({ taskTemplates, fetchTaskTemplates }) => {
         setCurrentTemplate(prevState => ({ ...prevState, [name]: value }));
     };
 
+    const handleMappingChange = (jiraFieldId, userField) => {
+        setFieldMappings(prev => ({ ...prev, [jiraFieldId]: userField }));
+    };
+
     const handleSaveTemplate = async (e) => {
         e.preventDefault();
         setError('');
         try {
             const currentUser = JSON.parse(localStorage.getItem('user'));
+            let config = {};
+
+            if (currentTemplate.task_type === 'automated_access_request') {
+                config.jira = {
+                    serviceDeskId: selectedServiceDesk,
+                    requestTypeId: selectedRequestType,
+                    fieldMappings: fieldMappings 
+                };
+            } else {
+                config = JSON.parse(currentTemplate.config || '{}');
+            }
+
             const payload = {
                 ...currentTemplate,
-                config: JSON.parse(currentTemplate.config),
-                created_by: currentUser.id // This should ideally be handled by the backend based on the token
+                config,
+                created_by: currentUser.id
             };
 
             if (isEditing) {
@@ -245,7 +333,7 @@ const TaskTemplates = ({ taskTemplates, fetchTaskTemplates }) => {
             handleCloseModal();
             fetchTaskTemplates();
         } catch (err) {
-            setError('Failed to save template. Ensure config is valid JSON.');
+            setError('Failed to save template. Ensure config is valid JSON if entered manually.');
             console.error(err);
         }
     };
@@ -310,40 +398,72 @@ const TaskTemplates = ({ taskTemplates, fetchTaskTemplates }) => {
                             <MenuItem value="automated_access_request">Automated Access Request</MenuItem>
                         </Select>
                     </FormControl>
-                    <TextField
-                        margin="normal"
-                        fullWidth
-                        label="Configuration (JSON)"
-                        name="config"
-                        multiline
-                        rows={4}
-                        value={currentTemplate?.config || '{}'}
-                        onChange={handleInputChange}
-                        helperText="Enter a valid JSON object for task-specific settings."
-                    />
+
+                    {currentTemplate?.task_type === 'automated_access_request' && (
+                        <Paper variant="outlined" sx={{ p: 2, mt: 2 }}>
+                            <Typography variant="subtitle1" sx={{ mb: 1 }}>Jira Automation Config</Typography>
+                            <FormControl fullWidth margin="normal">
+                                <InputLabel>Service Desk</InputLabel>
+                                <Select value={selectedServiceDesk} label="Service Desk" onChange={(e) => setSelectedServiceDesk(e.target.value)}>
+                                    {serviceDesks.map(desk => <MenuItem key={desk.id} value={desk.id}>{desk.projectName}</MenuItem>)}
+                                </Select>
+                            </FormControl>
+                            <FormControl fullWidth margin="normal" disabled={!selectedServiceDesk}>
+                                <InputLabel>Request Type</InputLabel>
+                                <Select value={selectedRequestType} label="Request Type" onChange={(e) => setSelectedRequestType(e.target.value)}>
+                                    {requestTypes.map(type => <MenuItem key={type.id} value={type.id}>{type.name}</MenuItem>)}
+                                </Select>
+                            </FormControl>
+                            
+                            {jiraFields.length > 0 && (
+                                <Box sx={{ mt: 2 }}>
+                                    <Typography>Map Jira Fields:</Typography>
+                                    {jiraFields.filter(f => f.required).map(field => (
+                                        <Grid container spacing={2} key={field.fieldId} alignItems="center" sx={{mt: 1}}>
+                                            <Grid item xs={6}>
+                                                <Typography variant="body2">{field.name}</Typography>
+                                            </Grid>
+                                            <Grid item xs={6}>
+                                                <FormControl fullWidth size="small">
+                                                    <InputLabel>Map to User Field</InputLabel>
+                                                    <Select
+                                                        value={fieldMappings[field.fieldId] || ''}
+                                                        label="Map to User Field"
+                                                        onChange={(e) => handleMappingChange(field.fieldId, e.target.value)}
+                                                    >
+                                                        {userFields.map(uf => <MenuItem key={uf} value={uf}>{uf}</MenuItem>)}
+                                                    </Select>
+                                                </FormControl>
+                                            </Grid>
+                                        </Grid>
+                                    ))}
+                                </Box>
+                            )}
+                        </Paper>
+                    )}
+
+                    {currentTemplate?.task_type !== 'automated_access_request' && (
+                         <TextField
+                            margin="normal"
+                            fullWidth
+                            label="Configuration (JSON)"
+                            name="config"
+                            multiline
+                            rows={4}
+                            value={currentTemplate?.config || '{}'}
+                            onChange={handleInputChange}
+                        />
+                    )}
+                    
                     <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
                         <Button onClick={handleCloseModal} sx={{ mr: 1 }}>Cancel</Button>
                         <Button type="submit" variant="contained">Save</Button>
                     </Box>
                 </Box>
             </Modal>
-
-            <Dialog open={dialogOpen} onClose={handleCloseDialog}>
-                <DialogTitle>Delete Task Template</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>
-                        Are you sure you want to delete the template "{currentTemplate?.name}"? This cannot be undone.
-                    </DialogContentText>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={handleCloseDialog}>Cancel</Button>
-                    <Button onClick={handleDeleteTemplate} color="error">Delete</Button>
-                </DialogActions>
-            </Dialog>
         </Paper>
     );
 };
-
 
 const ManageTemplates = () => {
     const [taskTemplates, setTaskTemplates] = useState([]);

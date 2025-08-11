@@ -1,16 +1,22 @@
 import { Router } from 'express';
-import { getAllUsers, getUserById, updateUser, deleteUser } from '../services/userService.js';
+import { getAllUsers, getUserById, updateUser, deleteUser, getUserFields } from '../services/userService.js';
 
 const router = Router();
 
+router.get('/fields', async (req, res) => {
+    try {
+        const fields = await getUserFields();
+        res.json(fields);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to retrieve user fields.' });
+    }
+});
+
 router.get('/', async (req, res) => {
-    console.log('[userRoutes] GET / handler reached.');
     try {
         const users = await getAllUsers();
-        console.log(`[userRoutes] Found ${users.length} users.`);
         res.json(users);
     } catch (error) {
-        console.error('[userRoutes] Error fetching all users:', error);
         res.status(500).json({ error: 'Failed to retrieve users.' });
     }
 });

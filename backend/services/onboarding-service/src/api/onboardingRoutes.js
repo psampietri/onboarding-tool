@@ -66,9 +66,9 @@ router.put('/tasks/:taskId', async (req, res) => {
 // Execute an automated task
 router.post('/tasks/:taskId/execute', async (req, res) => {
     try {
-        // In a real application, this would trigger an external API call
-        // For now, we will simulate the process by updating the task status
-        const result = await OnboardingService.executeAutomatedTask(req.params.taskId);
+        // Pass the authorization header from the original request
+        const authToken = req.headers['authorization'];
+        const result = await OnboardingService.executeAutomatedTask(req.params.taskId, authToken);
         res.json(result);
     } catch (error) {
         console.error('Error executing automated task:', error);

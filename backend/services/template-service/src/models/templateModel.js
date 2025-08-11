@@ -36,8 +36,19 @@ export const findAllOnboardingTemplates = async () => {
 };
 
 export const findOnboardingTemplateById = async (id) => {
-    const { rows } = await pool.query('SELECT * FROM onboarding_templates WHERE id = $1', [id]);
-    return rows[0];
+    const templateRes = await pool.query('SELECT * FROM onboarding_templates WHERE id = $1', [id]);
+    if (templateRes.rows.length === 0) {
+        return null;
+    }
+    const template = templateRes.rows[0];
+
+    const tasksRes = await pool.query(
+        'SELECT task_template_id FROM onboarding_template_tasks WHERE onboarding_template_id = $1 ORDER BY "order"',
+        [id]
+    );
+    template.tasks = tasksRes.rows.map(row => row.task_template_id);
+    
+    return template;
 };
 
 export const updateOnboardingTemplate = async (id, { name, description, tasks }) => {

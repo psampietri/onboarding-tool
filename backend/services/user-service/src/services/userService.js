@@ -15,3 +15,7 @@ export const updateUser = async (id, userData) => {
 export const deleteUser = async (id) => {
     return await UserModel.deleteUser(id);
 };
+
+export const getUserFields = async () => {
+    return await UserModel.findUserFields();
+};
