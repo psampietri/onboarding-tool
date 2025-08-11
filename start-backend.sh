@@ -8,7 +8,7 @@ echo "Starting all backend services..."
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
 
 # List of services
-SERVICES=("api-gateway" "services/user-service" "services/template-service" "services/onboarding-service" "services/analytics-service")
+SERVICES=("api-gateway" "services/user-service" "services/template-service" "services/onboarding-service" "services/analytics-service" "services/integration-service")
 
 for service in "${SERVICES[@]}"; do
     SERVICE_PATH="$SCRIPT_DIR/backend/$service"

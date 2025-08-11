@@ -19,3 +19,11 @@ export const deleteUser = async (id) => {
 export const getUserFields = async () => {
     return await UserModel.findUserFields();
 };
+
+export const addUserField = async (fieldName) => {
+    return await UserModel.addUserField(fieldName);
+};
+
+export const deleteUserField = async (fieldName) => {
+    return await UserModel.deleteUserField(fieldName);
+};

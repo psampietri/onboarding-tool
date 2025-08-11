@@ -12,6 +12,7 @@ import api from '../../services/api';
 import { getServiceDesks, getRequestTypes, getRequestTypeFields } from '../../services/integrationService';
 import { getUserFields } from '../../services/userService';
 
+
 const style = {
     position: 'absolute',
     top: '50%',
@@ -229,6 +230,7 @@ const TaskTemplates = ({ taskTemplates, fetchTaskTemplates }) => {
         if (currentTemplate?.task_type === 'automated_access_request') {
             const fetchDesks = async () => {
                 try {
+                    // Using "MSI" as the hardcoded configKey for this example
                     const desks = await getServiceDesks('jira', 'MSI');
                     setServiceDesks(desks.values);
                 } catch (err) {
@@ -298,8 +300,11 @@ const TaskTemplates = ({ taskTemplates, fetchTaskTemplates }) => {
         setCurrentTemplate(prevState => ({ ...prevState, [name]: value }));
     };
 
-    const handleMappingChange = (jiraFieldId, userField) => {
-        setFieldMappings(prev => ({ ...prev, [jiraFieldId]: userField }));
+    const handleMappingChange = (jiraFieldId, mappingType, value) => {
+        setFieldMappings(prev => ({
+            ...prev,
+            [jiraFieldId]: { type: mappingType, value: value }
+        }));
     };
 
     const handleSaveTemplate = async (e) => {
@@ -313,7 +318,8 @@ const TaskTemplates = ({ taskTemplates, fetchTaskTemplates }) => {
                 config.jira = {
                     serviceDeskId: selectedServiceDesk,
                     requestTypeId: selectedRequestType,
-                    fieldMappings: fieldMappings 
+                    fieldMappings: fieldMappings,
+                    configKey: 'MSI' // Making this dynamic is a future step
                 };
             } else {
                 config = JSON.parse(currentTemplate.config || '{}');
@@ -349,6 +355,40 @@ const TaskTemplates = ({ taskTemplates, fetchTaskTemplates }) => {
             console.error(err);
         }
     };
+
+    // Helper to render the correct input for static values
+    const renderStaticInput = (field) => {
+        const mapping = fieldMappings[field.fieldId] || {};
+        const hasValidValues = field.validValues && field.validValues.length > 0;
+        const isMultiSelect = field.jiraSchema?.type === 'array' && field.jiraSchema?.items === 'option';
+
+        if (hasValidValues) {
+            return (
+                <FormControl fullWidth size="small">
+                    <InputLabel>Select Value</InputLabel>
+                    <Select
+                        multiple={isMultiSelect}
+                        value={mapping.value || (isMultiSelect ? [] : '')}
+                        label="Select Value"
+                        onChange={(e) => handleMappingChange(field.fieldId, 'static', e.target.value)}
+                    >
+                        {field.validValues.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
+                    </Select>
+                </FormControl>
+            );
+        }
+
+        return (
+            <TextField
+                fullWidth
+                size="small"
+                label="Static Value"
+                value={mapping.value || ''}
+                onChange={(e) => handleMappingChange(field.fieldId, 'static', e.target.value)}
+            />
+        );
+    };
+
 
     return (
         <Paper sx={{ p: 2, mt: 4 }}>
@@ -400,7 +440,7 @@ const TaskTemplates = ({ taskTemplates, fetchTaskTemplates }) => {
                     </FormControl>
 
                     {currentTemplate?.task_type === 'automated_access_request' && (
-                        <Paper variant="outlined" sx={{ p: 2, mt: 2 }}>
+                        <Paper variant="outlined" sx={{ p: 2, mt: 2, maxHeight: 300, overflowY: 'auto' }}>
                             <Typography variant="subtitle1" sx={{ mb: 1 }}>Jira Automation Config</Typography>
                             <FormControl fullWidth margin="normal">
                                 <InputLabel>Service Desk</InputLabel>
@@ -419,21 +459,38 @@ const TaskTemplates = ({ taskTemplates, fetchTaskTemplates }) => {
                                 <Box sx={{ mt: 2 }}>
                                     <Typography>Map Jira Fields:</Typography>
                                     {jiraFields.filter(f => f.required).map(field => (
-                                        <Grid container spacing={2} key={field.fieldId} alignItems="center" sx={{mt: 1}}>
-                                            <Grid item xs={6}>
-                                                <Typography variant="body2">{field.name}</Typography>
+                                        <Grid container spacing={1} key={field.fieldId} alignItems="center" sx={{mt: 1}}>
+                                            <Grid item xs={12} sm={4}>
+                                                <Typography variant="body2" title={field.name}>{field.name}</Typography>
                                             </Grid>
-                                            <Grid item xs={6}>
+                                            <Grid item xs={6} sm={3}>
                                                 <FormControl fullWidth size="small">
-                                                    <InputLabel>Map to User Field</InputLabel>
+                                                    <InputLabel>Type</InputLabel>
                                                     <Select
-                                                        value={fieldMappings[field.fieldId] || ''}
-                                                        label="Map to User Field"
-                                                        onChange={(e) => handleMappingChange(field.fieldId, e.target.value)}
+                                                        value={fieldMappings[field.fieldId]?.type || 'dynamic'}
+                                                        label="Type"
+                                                        onChange={(e) => handleMappingChange(field.fieldId, e.target.value, '')}
                                                     >
-                                                        {userFields.map(uf => <MenuItem key={uf} value={uf}>{uf}</MenuItem>)}
+                                                        <MenuItem value="dynamic">Dynamic</MenuItem>
+                                                        <MenuItem value="static">Static</MenuItem>
                                                     </Select>
                                                 </FormControl>
+                                            </Grid>
+                                            <Grid item xs={6} sm={5}>
+                                                {fieldMappings[field.fieldId]?.type === 'static' ? (
+                                                    renderStaticInput(field)
+                                                ) : (
+                                                    <FormControl fullWidth size="small">
+                                                        <InputLabel>User Field</InputLabel>
+                                                        <Select
+                                                            value={fieldMappings[field.fieldId]?.value || ''}
+                                                            label="User Field"
+                                                            onChange={(e) => handleMappingChange(field.fieldId, 'dynamic', e.target.value)}
+                                                        >
+                                                            {userFields.map(uf => <MenuItem key={uf} value={uf}>{uf}</MenuItem>)}
+                                                        </Select>
+                                                    </FormControl>
+                                                )}
                                             </Grid>
                                         </Grid>
                                     ))}

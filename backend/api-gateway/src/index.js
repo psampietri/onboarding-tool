@@ -10,19 +10,16 @@ const SECRET_KEY = process.env.SECRET_KEY;
 
 app.use(cors());
 
-// A gateway's primary job is to proxy requests, not to parse their bodies.
-// We remove express.json() from the gateway and let the downstream services
-// handle body parsing. This is a more robust and standard pattern.
-
 const services = {
     user: 'http://localhost:5001',
     template: 'http://localhost:5002',
     onboarding: 'http://localhost:5003',
     analytics: 'http://localhost:5004',
+    integration: 'http://localhost:5005', // Add the new service
 };
 
 const commonProxyOptions = {
-    changeOrigin: true, // Recommended for robust proxying
+    changeOrigin: true,
 };
 
 // Authentication middleware
@@ -47,6 +44,10 @@ app.use('/api/users', authenticateToken, createProxyMiddleware({ ...commonProxyO
 app.use('/api/templates', authenticateToken, createProxyMiddleware({ ...commonProxyOptions, target: services.template, pathRewrite: { '^/api/templates': '' } }));
 app.use('/api/onboarding', authenticateToken, createProxyMiddleware({ ...commonProxyOptions, target: services.onboarding, pathRewrite: { '^/api/onboarding': '' } }));
 app.use('/api/analytics', authenticateToken, createProxyMiddleware({ ...commonProxyOptions, target: services.analytics, pathRewrite: { '^/api/analytics': '' } }));
+
+// Add the new proxy route for the integration service
+app.use('/api/integrations', authenticateToken, createProxyMiddleware({ ...commonProxyOptions, target: services.integration, pathRewrite: { '^/api/integrations': '' } }));
+
 
 app.listen(PORT, () => {
     console.log(`API Gateway listening on port ${PORT}`);

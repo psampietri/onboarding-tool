@@ -1,7 +1,9 @@
 import { Router } from 'express';
-import { getAllUsers, getUserById, updateUser, deleteUser, getUserFields } from '../services/userService.js';
+import { getAllUsers, getUserById, updateUser, deleteUser, getUserFields, addUserField, deleteUserField } from '../services/userService.js';
 
 const router = Router();
+
+// --- User Field Management ---
 
 router.get('/fields', async (req, res) => {
     try {
@@ -11,6 +13,29 @@ router.get('/fields', async (req, res) => {
         res.status(500).json({ error: 'Failed to retrieve user fields.' });
     }
 });
+
+router.post('/fields', async (req, res) => {
+    try {
+        const { fieldName } = req.body;
+        await addUserField(fieldName);
+        res.status(201).json({ message: `Field '${fieldName}' added successfully.` });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+router.delete('/fields/:fieldName', async (req, res) => {
+    try {
+        const { fieldName } = req.params;
+        await deleteUserField(fieldName);
+        res.status(200).json({ message: `Field '${fieldName}' deleted successfully.` });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+
+// --- User Management ---
 
 router.get('/', async (req, res) => {
     try {
@@ -35,8 +60,7 @@ router.get('/:id', async (req, res) => {
 
 router.put('/:id', async (req, res) => {
     try {
-        const { email, name, role } = req.body;
-        const updatedUser = await updateUser(req.params.id, { email, name, role });
+        const updatedUser = await updateUser(req.params.id, req.body);
         res.json(updatedUser);
     } catch (error) {
         res.status(400).json({ error: error.message });

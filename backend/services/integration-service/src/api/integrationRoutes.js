@@ -6,6 +6,7 @@ const router = Router();
 // --- JIRA READ OPERATIONS ---
 
 router.get('/jira/servicedesks', async (req, res) => {
+    console.log('[integrationRoutes] GET /jira/servicedesks handler reached.'); // New log
     try {
         const { configKey } = req.query;
         const serviceDesks = await getServiceDesks(configKey);

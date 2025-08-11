@@ -1,5 +1,13 @@
 import pool from 'database';
 
+// Helper to sanitize column names to prevent SQL injection
+const sanitizeColumnName = (name) => {
+    if (!/^[a-zA-Z0-9_]+$/.test(name)) {
+        throw new Error('Invalid field name. Only alphanumeric characters and underscores are allowed.');
+    }
+    return `"${name}"`; // Quote the column name to handle case sensitivity and reserved words
+};
+
 export const findUserByEmail = async (email) => {
     const { rows } = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
     return rows[0];
@@ -14,19 +22,24 @@ export const createUser = async (email, name, password_hash, role) => {
 };
 
 export const findAllUsers = async () => {
-    const { rows } = await pool.query('SELECT id, email, name, role FROM users');
+    const { rows } = await pool.query('SELECT * FROM users ORDER BY name');
     return rows;
 }
 
 export const findUserById = async (id) => {
-    const { rows } = await pool.query('SELECT id, email, name, role FROM users WHERE id = $1', [id]);
+    const { rows } = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
     return rows[0];
 }
 
-export const updateUser = async (id, { email, name, role }) => {
+export const updateUser = async (id, userData) => {
+    // Dynamically build the SET clause to handle any user field
+    const fields = Object.keys(userData).filter(key => key !== 'id');
+    const setClause = fields.map((field, index) => `${sanitizeColumnName(field)} = $${index + 1}`).join(', ');
+    const values = fields.map(field => userData[field]);
+    
     const { rows } = await pool.query(
-        'UPDATE users SET email = $1, name = $2, role = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4 RETURNING id, email, name, role',
-        [email, name, role, id]
+        `UPDATE users SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = $${fields.length + 1} RETURNING *`,
+        [...values, id]
     );
     return rows[0];
 }
@@ -42,4 +55,20 @@ export const findUserFields = async () => {
          WHERE table_schema = 'public' AND table_name = 'users' AND column_name NOT LIKE '%_hash' AND column_name NOT LIKE '%_at'`
     );
     return rows.map(row => row.column_name);
+};
+
+export const addUserField = async (fieldName) => {
+    const sanitizedFieldName = sanitizeColumnName(fieldName);
+    // Add new columns as TEXT by default. You could extend this to support other types.
+    await pool.query(`ALTER TABLE users ADD COLUMN ${sanitizedFieldName} TEXT`);
+};
+
+export const deleteUserField = async (fieldName) => {
+    const sanitizedFieldName = sanitizeColumnName(fieldName);
+    // Core fields that should not be deleted
+    const protectedFields = ['id', 'email', 'name', 'password_hash', 'role', 'created_at', 'updated_at'];
+    if (protectedFields.includes(fieldName.toLowerCase())) {
+        throw new Error(`Cannot delete a core system field: ${fieldName}`);
+    }
+    await pool.query(`ALTER TABLE users DROP COLUMN ${sanitizedFieldName}`);
 };

@@ -3,11 +3,12 @@ import {
     Container, Typography, Paper, TableContainer, Table, TableHead,
     TableRow, TableCell, TableBody, CircularProgress, Box, Alert, Button,
     Modal, TextField, FormControl, InputLabel, Select, MenuItem, IconButton,
-    Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle
+    Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, List, ListItem, ListItemText
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import api from '../../services/api';
+import { getUserFields, addUserField, deleteUserField } from '../../services/userService';
 
 const style = {
     position: 'absolute',
@@ -21,28 +22,93 @@ const style = {
     p: 4,
 };
 
+const ManageFieldsModal = ({ open, onClose, userFields, onFieldUpdate }) => {
+    const [newFieldName, setNewFieldName] = useState('');
+    const [error, setError] = useState('');
+
+    const handleAddField = async (e) => {
+        e.preventDefault();
+        setError('');
+        try {
+            await addUserField(newFieldName);
+            setNewFieldName('');
+            onFieldUpdate(); // Callback to refresh fields in parent
+        } catch (err) {
+            setError('Failed to add field.');
+            console.error(err);
+        }
+    };
+
+    const handleDeleteField = async (fieldName) => {
+        setError('');
+        try {
+            await deleteUserField(fieldName);
+            onFieldUpdate(); // Callback to refresh fields in parent
+        } catch (err) {
+            setError('Failed to delete field.');
+            console.error(err);
+        }
+    };
+
+    return (
+        <Modal open={open} onClose={onClose}>
+            <Box sx={style}>
+                <Typography variant="h6" component="h2">Manage User Fields</Typography>
+                {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+                <List sx={{ maxHeight: 200, overflow: 'auto', my: 2 }}>
+                    {userFields.map(field => (
+                        <ListItem key={field} secondaryAction={
+                            <IconButton edge="end" aria-label="delete" onClick={() => handleDeleteField(field)}>
+                                <DeleteIcon />
+                            </IconButton>
+                        }>
+                            <ListItemText primary={field} />
+                        </ListItem>
+                    ))}
+                </List>
+                <Box component="form" onSubmit={handleAddField} sx={{ display: 'flex', gap: 1 }}>
+                    <TextField
+                        size="small"
+                        fullWidth
+                        label="New Field Name"
+                        value={newFieldName}
+                        onChange={(e) => setNewFieldName(e.target.value)}
+                    />
+                    <Button type="submit" variant="contained">Add</Button>
+                </Box>
+            </Box>
+        </Modal>
+    );
+};
+
+
 const ManageUsers = () => {
     const [users, setUsers] = useState([]);
+    const [userFields, setUserFields] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     
-    // State for the create/edit modal
     const [modalOpen, setModalOpen] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
-    const [currentUser, setCurrentUser] = useState({ id: null, name: '', email: '', password: '', role: 'user' });
+    const [currentUser, setCurrentUser] = useState(null);
 
-    // State for the delete confirmation dialog
     const [dialogOpen, setDialogOpen] = useState(false);
     const [userToDelete, setUserToDelete] = useState(null);
+    
+    const [fieldsModalOpen, setFieldsModalOpen] = useState(false);
 
 
-    const fetchUsers = async () => {
+    const fetchData = async () => {
         try {
             setLoading(true);
-            const response = await api.get('/users');
-            setUsers(response.data);
+            const [usersRes, fieldsRes] = await Promise.all([
+                api.get('/users'),
+                getUserFields()
+            ]);
+            setUsers(usersRes.data);
+            setUserFields(fieldsRes);
         } catch (err) {
-            setError('Failed to fetch users.');
+            setError('Failed to fetch user data.');
             console.error('Fetch users error:', err);
         } finally {
             setLoading(false);
@@ -50,18 +116,18 @@ const ManageUsers = () => {
     };
 
     useEffect(() => {
-        fetchUsers();
+        fetchData();
     }, []);
 
     const handleOpenCreateModal = () => {
         setIsEditing(false);
-        setCurrentUser({ id: null, name: '', email: '', password: '', role: 'user' });
+        setCurrentUser({});
         setModalOpen(true);
     };
 
     const handleOpenEditModal = (user) => {
         setIsEditing(true);
-        setCurrentUser({ ...user, password: '' }); // Don't pre-fill password for editing
+        setCurrentUser({ ...user });
         setModalOpen(true);
     };
 
@@ -87,23 +153,12 @@ const ManageUsers = () => {
         setError('');
         try {
             if (isEditing) {
-                // Update existing user
-                await api.put(`/users/${currentUser.id}`, {
-                    name: currentUser.name,
-                    email: currentUser.email,
-                    role: currentUser.role,
-                });
+                await api.put(`/users/${currentUser.id}`, currentUser);
             } else {
-                // Create new user
-                await api.post('/auth/register', {
-                    name: currentUser.name,
-                    email: currentUser.email,
-                    password: currentUser.password,
-                    role: currentUser.role,
-                });
+                await api.post('/auth/register', currentUser);
             }
             handleCloseModal();
-            fetchUsers(); // Refresh the list
+            fetchData(); // Refresh the list
         } catch (err) {
             setError(`Failed to ${isEditing ? 'update' : 'create'} user.`);
             console.error('Save user error:', err);
@@ -115,7 +170,7 @@ const ManageUsers = () => {
         try {
             await api.delete(`/users/${userToDelete.id}`);
             handleCloseDialog();
-            fetchUsers(); // Refresh the list
+            fetchData(); // Refresh the list
         } catch (err) {
             setError('Failed to delete user.');
             console.error('Delete user error:', err);
@@ -132,29 +187,26 @@ const ManageUsers = () => {
                 <Typography variant="h4">
                     Manage Users
                 </Typography>
-                <Button variant="contained" onClick={handleOpenCreateModal}>Add User</Button>
+                <Box>
+                    <Button variant="outlined" sx={{ mr: 2 }} onClick={() => setFieldsModalOpen(true)}>Manage Fields</Button>
+                    <Button variant="contained" onClick={handleOpenCreateModal}>Add User</Button>
+                </Box>
             </Box>
 
             {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
             <TableContainer component={Paper}>
-                <Table sx={{ minWidth: 650 }} aria-label="simple table">
+                <Table sx={{ minWidth: 650 }}>
                     <TableHead>
                         <TableRow>
-                            <TableCell>ID</TableCell>
-                            <TableCell>Name</TableCell>
-                            <TableCell>Email</TableCell>
-                            <TableCell>Role</TableCell>
+                            {userFields.map(field => <TableCell key={field}>{field}</TableCell>)}
                             <TableCell align="right">Actions</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
                         {users.map((user) => (
                             <TableRow key={user.id}>
-                                <TableCell>{user.id}</TableCell>
-                                <TableCell>{user.name}</TableCell>
-                                <TableCell>{user.email}</TableCell>
-                                <TableCell>{user.role}</TableCell>
+                                {userFields.map(field => <TableCell key={`${user.id}-${field}`}>{user[field.toLowerCase()]}</TableCell>)}
                                 <TableCell align="right">
                                     <IconButton onClick={() => handleOpenEditModal(user)}><EditIcon /></IconButton>
                                     <IconButton onClick={() => handleOpenDialog(user)}><DeleteIcon /></IconButton>
@@ -170,24 +222,38 @@ const ManageUsers = () => {
                     <Typography variant="h6" component="h2">
                         {isEditing ? 'Edit User' : 'Create New User'}
                     </Typography>
-                    <TextField margin="normal" required fullWidth label="Full Name" name="name" value={currentUser.name} onChange={handleInputChange} />
-                    <TextField margin="normal" required fullWidth label="Email Address" name="email" type="email" value={currentUser.email} onChange={handleInputChange} />
-                    {!isEditing && (
-                        <TextField margin="normal" required fullWidth label="Password" name="password" type="password" value={currentUser.password} onChange={handleInputChange} />
-                    )}
-                    <FormControl fullWidth margin="normal">
-                        <InputLabel>Role</InputLabel>
-                        <Select name="role" value={currentUser.role} label="Role" onChange={handleInputChange}>
-                            <MenuItem value="user">User</MenuItem>
-                            <MenuItem value="admin">Admin</MenuItem>
-                        </Select>
-                    </FormControl>
+                    {userFields.map(field => {
+                        if (['id', 'created_at', 'updated_at'].includes(field)) return null;
+                        const isPassword = field.includes('password');
+                        if (isEditing && isPassword) return null; // Don't show password on edit
+
+                        return (
+                            <TextField 
+                                key={field}
+                                margin="normal" 
+                                required={!isEditing || field === 'name' || field === 'email'}
+                                fullWidth 
+                                label={field}
+                                name={field} 
+                                type={isPassword ? 'password' : 'text'}
+                                value={currentUser?.[field] || ''} 
+                                onChange={handleInputChange} 
+                            />
+                        )
+                    })}
                     <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
                         <Button onClick={handleCloseModal} sx={{ mr: 1 }}>Cancel</Button>
                         <Button type="submit" variant="contained">Save</Button>
                     </Box>
                 </Box>
             </Modal>
+            
+            <ManageFieldsModal 
+                open={fieldsModalOpen} 
+                onClose={() => setFieldsModalOpen(false)} 
+                userFields={userFields}
+                onFieldUpdate={fetchData}
+            />
 
             <Dialog open={dialogOpen} onClose={handleCloseDialog}>
                 <DialogTitle>Delete User</DialogTitle>

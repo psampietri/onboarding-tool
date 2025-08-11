@@ -14,6 +14,7 @@ PROJECTS=(
     "backend/services/template-service"
     "backend/services/onboarding-service"
     "backend/services/analytics-service"
+    "backend/services/integration-service"
     "frontend"
 )
 

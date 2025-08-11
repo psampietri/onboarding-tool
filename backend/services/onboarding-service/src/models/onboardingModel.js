@@ -1,4 +1,4 @@
-import pool from 'database';
+import pool from '../../../../database/index.js'; // FIX: Use direct relative path
 
 export const createOnboardingInstance = async (userId, templateId, assignedBy) => {
     const client = await pool.connect();

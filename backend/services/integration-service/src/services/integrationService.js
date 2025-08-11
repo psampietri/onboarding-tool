@@ -17,31 +17,39 @@ const callPlatformApi = async (configKey, endpoint, method = 'GET', body = null)
     const { baseUrl, apiToken } = getPlatformConfig(configKey);
     const url = `${baseUrl}${endpoint}`;
 
-    const options = {
-        method,
-        headers: {
-            'Authorization': `Bearer ${apiToken}`,
-            'Content-Type': 'application/json'
+    console.log(`[integration-service] Making API call: ${method} ${url}`);
+
+    try {
+        const options = {
+            method,
+            headers: {
+                'Authorization': `Bearer ${apiToken}`,
+                'Content-Type': 'application/json'
+            }
+        };
+
+        if (body) {
+            options.body = JSON.stringify(body);
         }
-    };
 
-    if (body) {
-        options.body = JSON.stringify(body);
+        const response = await fetch(url, options);
+
+        if (!response.ok) {
+            const errorBody = await response.text();
+            console.error(`[integration-service] API Error Response: ${errorBody}`);
+            throw new Error(`API request failed with status ${response.status}`);
+        }
+
+        // Handle responses with no content
+        if (response.status === 204) {
+            return null;
+        }
+
+        return response.json();
+    } catch (error) {
+        console.error(`[integration-service] FATAL: A network or fetch error occurred.`, error);
+        throw error;
     }
-
-    const response = await fetch(url, options);
-
-    if (!response.ok) {
-        const errorBody = await response.text();
-        throw new Error(`API request failed with status ${response.status}: ${errorBody}`);
-    }
-
-    // Handle responses with no content
-    if (response.status === 204) {
-        return null;
-    }
-
-    return response.json();
 };
 
 // --- Service Functions ---
