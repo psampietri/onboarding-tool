@@ -10,9 +10,9 @@ const SECRET_KEY = process.env.SECRET_KEY;
 
 app.use(cors());
 
-// The gateway's job is to proxy, not parse the body.
-// We remove the express.json() middleware here and let the
-// downstream services handle the body parsing.
+// A gateway's primary job is to proxy requests, not to parse their bodies.
+// We remove express.json() from the gateway and let the downstream services
+// handle body parsing. This is a more robust and standard pattern.
 
 const services = {
     user: 'http://localhost:5001',
@@ -21,7 +21,6 @@ const services = {
     analytics: 'http://localhost:5004',
 };
 
-// Common proxy options
 const commonProxyOptions = {
     changeOrigin: true, // Recommended for robust proxying
 };
@@ -44,7 +43,7 @@ const authenticateToken = (req, res, next) => {
 app.use('/api/auth', createProxyMiddleware({ ...commonProxyOptions, target: services.user, pathRewrite: { '^/api/auth': '' } }));
 
 // Protected routes
-app.use('/api/users', authenticateToken, createProxyMiddleware({ ...commonProxyOptions, target: services.user, pathRewrite: { '^/api/users': '/users' } }));
+app.use('/api/users', authenticateToken, createProxyMiddleware({ ...commonProxyOptions, target: services.user, pathRewrite: { '^/api/users': '' } }));
 app.use('/api/templates', authenticateToken, createProxyMiddleware({ ...commonProxyOptions, target: services.template, pathRewrite: { '^/api/templates': '' } }));
 app.use('/api/onboarding', authenticateToken, createProxyMiddleware({ ...commonProxyOptions, target: services.onboarding, pathRewrite: { '^/api/onboarding': '' } }));
 app.use('/api/analytics', authenticateToken, createProxyMiddleware({ ...commonProxyOptions, target: services.analytics, pathRewrite: { '^/api/analytics': '' } }));
