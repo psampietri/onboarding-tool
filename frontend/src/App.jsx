@@ -9,6 +9,7 @@ import AdminDashboard from './pages/admin/Dashboard';
 import UserDashboard from './pages/user/Dashboard';
 import ManageUsers from './pages/admin/ManageUsers';
 import ManageTemplates from './pages/admin/ManageTemplates';
+import OnboardingInstanceDetail from './pages/admin/OnboardingInstanceDetail'; // Import the new page
 
 const App = () => {
   return (
@@ -22,6 +23,8 @@ const App = () => {
           <Route path="dashboard" element={<AdminDashboard />} />
           <Route path="users" element={<ManageUsers />} />
           <Route path="templates" element={<ManageTemplates />} />
+          {/* Add the new route for the detail page */}
+          <Route path="onboarding/:instanceId" element={<OnboardingInstanceDetail />} />
         </Route>
 
         <Route path="/" element={<UserLayout />}>

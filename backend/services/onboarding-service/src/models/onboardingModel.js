@@ -33,6 +33,37 @@ export const createOnboardingInstance = async (userId, templateId, assignedBy) =
     }
 };
 
+export const findAllOnboardingInstances = async () => {
+    const { rows } = await pool.query(
+        `SELECT oi.id, oi.status, oi.created_at, u.name as user_name, a.name as admin_name, ot.name as template_name
+         FROM onboarding_instances oi
+         JOIN users u ON oi.user_id = u.id
+         JOIN users a ON oi.assigned_by = a.id
+         JOIN onboarding_templates ot ON oi.onboarding_template_id = ot.id
+         ORDER BY oi.created_at DESC`
+    );
+    return rows;
+};
+
+export const findOnboardingInstanceById = async (id) => {
+    const instanceRes = await pool.query('SELECT * FROM onboarding_instances WHERE id = $1', [id]);
+    if (instanceRes.rows.length === 0) {
+        return null;
+    }
+    const instance = instanceRes.rows[0];
+
+    const tasksRes = await pool.query(
+        `SELECT ti.*, tt.name, tt.description, tt.task_type
+         FROM task_instances ti
+         JOIN task_templates tt ON ti.task_template_id = tt.id
+         WHERE ti.onboarding_instance_id = $1
+         ORDER BY ti.id`,
+        [id]
+    );
+    instance.tasks = tasksRes.rows;
+    return instance;
+};
+
 export const findTasksByUserId = async (userId) => {
     const { rows } = await pool.query(
         `SELECT ti.*, tt.name, tt.description, tt.task_type

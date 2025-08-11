@@ -4,6 +4,14 @@ export const assignOnboarding = async (userId, templateId, assignedBy) => {
     return await OnboardingModel.createOnboardingInstance(userId, templateId, assignedBy);
 };
 
+export const getAllOnboardingInstances = async () => {
+    return await OnboardingModel.findAllOnboardingInstances();
+};
+
+export const getOnboardingInstanceById = async (id) => {
+    return await OnboardingModel.findOnboardingInstanceById(id);
+};
+
 export const getOnboardingStatusForUser = async (userId) => {
     return await OnboardingModel.findTasksByUserId(userId);
 };

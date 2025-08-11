@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Typography, Card, CardContent, List, ListItem, ListItemText, Checkbox, CircularProgress, Box } from '@mui/material';
+import {
+    Container, Typography, Card, CardContent, List, ListItem, ListItemText,
+    Checkbox, CircularProgress, Box, Alert
+} from '@mui/material';
 import { getOnboardingStatusForUser, updateTaskStatus } from '../../services/onboardingService';
 
 const UserDashboard = () => {
@@ -37,7 +40,7 @@ const UserDashboard = () => {
             ));
         } catch (err) {
             console.error('Failed to update task status:', err);
-            // Optionally show an error to the user
+            setError('Could not update task status.');
         }
     };
 
@@ -45,15 +48,12 @@ const UserDashboard = () => {
         return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}><CircularProgress /></Box>;
     }
 
-    if (error) {
-        return <Typography color="error">{error}</Typography>;
-    }
-
     return (
         <Container>
             <Typography variant="h4" gutterBottom>
                 Your Onboarding Progress
             </Typography>
+            {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
             <Card>
                 <CardContent>
                     {tasks.length > 0 ? (
@@ -64,9 +64,13 @@ const UserDashboard = () => {
                                         edge="start"
                                         checked={task.status === 'completed'}
                                         onChange={() => handleTaskToggle(task.id, task.status)}
+                                        // Only allow users to check off manual tasks
                                         disabled={task.task_type !== 'manual'}
                                     />
-                                    <ListItemText primary={task.name} secondary={task.description} />
+                                    <ListItemText 
+                                        primary={task.name} 
+                                        secondary={`${task.description} [Status: ${task.status}]`} 
+                                    />
                                 </ListItem>
                             ))}
                         </List>
