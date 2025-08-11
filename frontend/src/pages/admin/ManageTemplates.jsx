@@ -3,7 +3,7 @@ import {
     Container, Typography, Paper, TableContainer, Table, TableHead,
     TableRow, TableCell, TableBody, CircularProgress, Box, Alert, Button,
     Modal, TextField, FormControl, InputLabel, Select, MenuItem, IconButton,
-    List, ListItem, ListItemText, Checkbox, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Grid
+    List, ListItem, ListItemText, Checkbox, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Grid, Chip
 } from '@mui/material';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import EditIcon from '@mui/icons-material/Edit';
@@ -230,7 +230,6 @@ const TaskTemplates = ({ taskTemplates, fetchTaskTemplates }) => {
         if (currentTemplate?.task_type === 'automated_access_request') {
             const fetchDesks = async () => {
                 try {
-                    // Using "MSI" as the hardcoded configKey for this example
                     const desks = await getServiceDesks('jira', 'MSI');
                     setServiceDesks(desks.values);
                 } catch (err) {
@@ -272,7 +271,7 @@ const TaskTemplates = ({ taskTemplates, fetchTaskTemplates }) => {
 
     const handleOpenCreateModal = () => {
         setIsEditing(false);
-        setCurrentTemplate({ name: '', description: '', task_type: 'manual', config: '{}' });
+        setCurrentTemplate({ name: '', description: '', task_type: 'manual', config: '{}', dependencies: [] });
         setSelectedServiceDesk('');
         setSelectedRequestType('');
         setJiraFields([]);
@@ -283,7 +282,6 @@ const TaskTemplates = ({ taskTemplates, fetchTaskTemplates }) => {
     const handleOpenEditModal = (template) => {
         setIsEditing(true);
         setCurrentTemplate({ ...template, config: JSON.stringify(template.config || {}, null, 2) });
-        // Logic to pre-fill selections for editing would go here
         setModalOpen(true);
     };
 
@@ -319,7 +317,7 @@ const TaskTemplates = ({ taskTemplates, fetchTaskTemplates }) => {
                     serviceDeskId: selectedServiceDesk,
                     requestTypeId: selectedRequestType,
                     fieldMappings: fieldMappings,
-                    configKey: 'MSI' // Making this dynamic is a future step
+                    configKey: 'MSI'
                 };
             } else {
                 config = JSON.parse(currentTemplate.config || '{}');
@@ -356,7 +354,6 @@ const TaskTemplates = ({ taskTemplates, fetchTaskTemplates }) => {
         }
     };
 
-    // Helper to render the correct input for static values
     const renderStaticInput = (field) => {
         const mapping = fieldMappings[field.fieldId] || {};
         const hasValidValues = field.validValues && field.validValues.length > 0;
@@ -405,7 +402,7 @@ const TaskTemplates = ({ taskTemplates, fetchTaskTemplates }) => {
                         <TableRow>
                             <TableCell>Name</TableCell>
                             <TableCell>Type</TableCell>
-                            <TableCell>Description</TableCell>
+                            <TableCell>Dependencies</TableCell>
                             <TableCell align="right">Actions</TableCell>
                         </TableRow>
                     </TableHead>
@@ -414,7 +411,12 @@ const TaskTemplates = ({ taskTemplates, fetchTaskTemplates }) => {
                             <TableRow key={template.id}>
                                 <TableCell>{template.name}</TableCell>
                                 <TableCell>{template.task_type}</TableCell>
-                                <TableCell>{template.description}</TableCell>
+                                <TableCell>
+                                    {template.dependencies?.map(depId => {
+                                        const dep = taskTemplates.find(t => t.id === depId);
+                                        return <Chip key={depId} label={dep?.name || '...'} size="small" sx={{ mr: 0.5 }} />;
+                                    })}
+                                </TableCell>
                                 <TableCell align="right">
                                     <IconButton size="small" onClick={() => handleOpenEditModal(template)}><EditIcon fontSize="small" /></IconButton>
                                     <IconButton size="small" onClick={() => handleOpenDeleteDialog(template)}><DeleteIcon fontSize="small" /></IconButton>
@@ -436,6 +438,29 @@ const TaskTemplates = ({ taskTemplates, fetchTaskTemplates }) => {
                             <MenuItem value="manual">Manual Task</MenuItem>
                             <MenuItem value="manual_access_request">Manual Access Request</MenuItem>
                             <MenuItem value="automated_access_request">Automated Access Request</MenuItem>
+                        </Select>
+                    </FormControl>
+
+                    <FormControl fullWidth margin="normal">
+                        <InputLabel>Dependencies</InputLabel>
+                        <Select
+                            multiple
+                            name="dependencies"
+                            value={currentTemplate?.dependencies || []}
+                            onChange={handleInputChange}
+                            label="Dependencies"
+                            renderValue={(selected) => (
+                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                                    {selected.map((value) => {
+                                        const dep = taskTemplates.find(t => t.id === value);
+                                        return <Chip key={value} label={dep?.name || value} />;
+                                    })}
+                                </Box>
+                            )}
+                        >
+                            {taskTemplates.filter(t => t.id !== currentTemplate?.id).map(t => (
+                                <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>
+                            ))}
                         </Select>
                     </FormControl>
 
@@ -497,19 +522,6 @@ const TaskTemplates = ({ taskTemplates, fetchTaskTemplates }) => {
                                 </Box>
                             )}
                         </Paper>
-                    )}
-
-                    {currentTemplate?.task_type !== 'automated_access_request' && (
-                         <TextField
-                            margin="normal"
-                            fullWidth
-                            label="Configuration (JSON)"
-                            name="config"
-                            multiline
-                            rows={4}
-                            value={currentTemplate?.config || '{}'}
-                            onChange={handleInputChange}
-                        />
                     )}
                     
                     <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>

@@ -60,9 +60,21 @@ export const findOnboardingInstanceById = async (id) => {
     const instance = instanceRes.rows[0];
 
     const tasksRes = await pool.query(
-        `SELECT ti.*, tt.name, tt.description, tt.task_type
+        `SELECT 
+            ti.*, 
+            tt.name, 
+            tt.description, 
+            tt.task_type,
+            COALESCE(deps.dependencies, '[]'::json) as dependencies
          FROM task_instances ti
          JOIN task_templates tt ON ti.task_template_id = tt.id
+         LEFT JOIN (
+             SELECT 
+                 task_template_id, 
+                 json_agg(depends_on_id) as dependencies
+             FROM task_template_dependencies
+             GROUP BY task_template_id
+         ) deps ON ti.task_template_id = deps.task_template_id
          WHERE ti.onboarding_instance_id = $1
          ORDER BY ti.id`,
         [id]
@@ -73,10 +85,22 @@ export const findOnboardingInstanceById = async (id) => {
 
 export const findTasksByUserId = async (userId) => {
     const { rows } = await pool.query(
-        `SELECT ti.*, tt.name, tt.description, tt.task_type
+        `SELECT 
+            ti.*, 
+            tt.name, 
+            tt.description, 
+            tt.task_type,
+            COALESCE(deps.dependencies, '[]'::json) as dependencies
          FROM task_instances ti
          JOIN onboarding_instances oi ON ti.onboarding_instance_id = oi.id
          JOIN task_templates tt ON ti.task_template_id = tt.id
+         LEFT JOIN (
+             SELECT 
+                 task_template_id, 
+                 json_agg(depends_on_id) as dependencies
+             FROM task_template_dependencies
+             GROUP BY task_template_id
+         ) deps ON ti.task_template_id = deps.task_template_id
          WHERE oi.user_id = $1 AND oi.status != 'completed'`,
         [userId]
     );

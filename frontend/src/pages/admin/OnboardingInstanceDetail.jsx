@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import {
     Container, Typography, Paper, Box, CircularProgress, Alert,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Chip,
-    FormControl, Select, MenuItem, Button
+    FormControl, Select, MenuItem, Button, Tooltip
 } from '@mui/material';
+import LockIcon from '@mui/icons-material/Lock';
+import IconButton from '@mui/material/IconButton';
 import api from '../../services/api';
 import { executeAutomatedTask } from '../../services/onboardingService';
 
@@ -13,11 +15,10 @@ const OnboardingInstanceDetail = () => {
     const [instance, setInstance] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [taskLoading, setTaskLoading] = useState(null); // To show loading on a specific task
+    const [taskLoading, setTaskLoading] = useState(null);
 
     const fetchInstanceDetails = async () => {
         try {
-            // Keep the main loader on for full refresh
             setLoading(true);
             const response = await api.get(`/onboarding/instances/${instanceId}`);
             setInstance(response.data);
@@ -36,7 +37,6 @@ const OnboardingInstanceDetail = () => {
     const handleStatusChange = async (taskId, newStatus) => {
         try {
             await api.put(`/onboarding/tasks/${taskId}`, { status: newStatus });
-            // Refresh the details after updating
             fetchInstanceDetails();
         } catch (err) {
             setError('Failed to update task status.');
@@ -49,7 +49,7 @@ const OnboardingInstanceDetail = () => {
         setError('');
         try {
             await executeAutomatedTask(taskId);
-            fetchInstanceDetails(); // Refresh details after execution
+            fetchInstanceDetails();
         } catch (err) {
             setError('Failed to execute automated task.');
             console.error(err);
@@ -58,16 +58,32 @@ const OnboardingInstanceDetail = () => {
         }
     };
 
+    // Memoize the calculation of blocked tasks
+    const blockedTasks = useMemo(() => {
+        if (!instance?.tasks) return new Set();
+        
+        const completedTaskIds = new Set(
+            instance.tasks.filter(t => t.status === 'completed').map(t => t.task_template_id)
+        );
+        
+        const blocked = new Set();
+        instance.tasks.forEach(task => {
+            if (task.dependencies && task.dependencies.length > 0) {
+                const isBlocked = !task.dependencies.every(depId => completedTaskIds.has(depId));
+                if (isBlocked) {
+                    blocked.add(task.id);
+                }
+            }
+        });
+        return blocked;
+    }, [instance]);
+
     const getStatusChipColor = (status) => {
         switch (status) {
-            case 'completed':
-                return 'success';
-            case 'in_progress':
-                return 'warning';
-            case 'blocked':
-                return 'error';
-            default:
-                return 'default';
+            case 'completed': return 'success';
+            case 'in_progress': return 'warning';
+            case 'blocked': return 'error';
+            default: return 'default';
         }
     };
 
@@ -109,40 +125,48 @@ const OnboardingInstanceDetail = () => {
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {instance.tasks.map((task) => (
-                            <TableRow key={task.id}>
-                                <TableCell>{task.name}</TableCell>
-                                <TableCell>{task.task_type}</TableCell>
-                                <TableCell>
-                                    <FormControl size="small" sx={{ minWidth: 120 }}>
-                                        <Select
-                                            value={task.status}
-                                            onChange={(e) => handleStatusChange(task.id, e.target.value)}
-                                            renderValue={(selected) => (
-                                                <Chip label={selected} color={getStatusChipColor(selected)} size="small" />
-                                            )}
-                                        >
-                                            <MenuItem value="not_started">Not Started</MenuItem>
-                                            <MenuItem value="in_progress">In Progress</MenuItem>
-                                            <MenuItem value="completed">Completed</MenuItem>
-                                            <MenuItem value="blocked">Blocked</MenuItem>
-                                        </Select>
-                                    </FormControl>
-                                </TableCell>
-                                <TableCell>
-                                    {task.task_type === 'automated_access_request' && task.status === 'not_started' && (
-                                        <Button
-                                            variant="contained"
-                                            size="small"
-                                            onClick={() => handleExecuteTask(task.id)}
-                                            disabled={taskLoading === task.id}
-                                        >
-                                            {taskLoading === task.id ? <CircularProgress size={20} /> : 'Run Automation'}
-                                        </Button>
-                                    )}
-                                </TableCell>
-                            </TableRow>
-                        ))}
+                        {instance.tasks.map((task) => {
+                            const isBlocked = blockedTasks.has(task.id);
+                            return (
+                                <TableRow key={task.id} sx={{ opacity: isBlocked ? 0.6 : 1 }}>
+                                    <TableCell>{task.name}</TableCell>
+                                    <TableCell>{task.task_type}</TableCell>
+                                    <TableCell>
+                                        <FormControl size="small" sx={{ minWidth: 120 }} disabled={isBlocked}>
+                                            <Select
+                                                value={task.status}
+                                                onChange={(e) => handleStatusChange(task.id, e.target.value)}
+                                                renderValue={(selected) => (
+                                                    <Chip label={selected} color={getStatusChipColor(selected)} size="small" />
+                                                )}
+                                            >
+                                                <MenuItem value="not_started">Not Started</MenuItem>
+                                                <MenuItem value="in_progress">In Progress</MenuItem>
+                                                <MenuItem value="completed">Completed</MenuItem>
+                                                <MenuItem value="blocked">Blocked</MenuItem>
+                                            </Select>
+                                        </FormControl>
+                                    </TableCell>
+                                    <TableCell>
+                                        {isBlocked && (
+                                            <Tooltip title="This task is blocked by one or more incomplete dependencies.">
+                                                <IconButton><LockIcon /></IconButton>
+                                            </Tooltip>
+                                        )}
+                                        {task.task_type === 'automated_access_request' && task.status === 'not_started' && !isBlocked && (
+                                            <Button
+                                                variant="contained"
+                                                size="small"
+                                                onClick={() => handleExecuteTask(task.id)}
+                                                disabled={taskLoading === task.id}
+                                            >
+                                                {taskLoading === task.id ? <CircularProgress size={20} /> : 'Run Automation'}
+                                            </Button>
+                                        )}
+                                    </TableCell>
+                                </TableRow>
+                            );
+                        })}
                     </TableBody>
                 </Table>
             </TableContainer>
