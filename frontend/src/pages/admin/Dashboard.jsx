@@ -34,7 +34,7 @@ const StatCard = ({ title, value, icon }) => (
 );
 
 const AdminDashboard = () => {
-    const [stats, setStats] = useState({ activeOnboardings: 0, avgCompletionDays: 0, totalUsers: 0 });
+    const [stats, setStats] = useState({ activeOnboardings: 0, avgCompletionDays: 'N/A', totalUsers: 0 });
     const [instances, setInstances] = useState([]);
     const [users, setUsers] = useState([]);
     const [templates, setTemplates] = useState([]);
@@ -58,10 +58,18 @@ const AdminDashboard = () => {
             setInstances(instancesRes.data);
             setUsers(usersRes.data);
             setTemplates(templatesRes.data);
+            
+            // Format average completion time
+            let avgTime = 'N/A';
+            if (kpisRes.data.averageCompletionTimeHours) {
+                const { days, hours } = kpisRes.data.averageCompletionTimeHours;
+                avgTime = `${days || 0}d ${hours || 0}h`;
+            }
+
             setStats({
                 activeOnboardings: kpisRes.data.activeOnboardings,
-                totalUsers: usersRes.data.length,
-                avgCompletionDays: 'N/A' 
+                totalUsers: kpisRes.data.totalUsers,
+                avgCompletionDays: avgTime
             });
         } catch (err) {
             setError('Failed to load dashboard data.');
@@ -132,7 +140,7 @@ const AdminDashboard = () => {
                     <StatCard title="Total Users" value={stats.totalUsers} icon={<PeopleIcon color="secondary" sx={{ fontSize: 40 }} />} />
                 </Grid>
                 <Grid item xs={12} md={4}>
-                    <StatCard title="Avg. Completion Time (Days)" value={stats.avgCompletionDays} icon={<BarChartIcon color="success" sx={{ fontSize: 40 }} />} />
+                    <StatCard title="Avg. Completion Time" value={stats.avgCompletionDays} icon={<BarChartIcon color="success" sx={{ fontSize: 40 }} />} />
                 </Grid>
             </Grid>
 

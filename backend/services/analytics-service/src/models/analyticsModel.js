@@ -23,3 +23,8 @@ export const countCompletedOnboardings = async () => {
     );
     return parseInt(rows[0].count, 10);
 };
+
+export const countTotalUsers = async () => {
+    const { rows } = await pool.query("SELECT COUNT(*) FROM users");
+    return parseInt(rows[0].count, 10);
+};

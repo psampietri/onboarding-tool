@@ -46,7 +46,14 @@ export const findAllOnboardingInstances = async () => {
 };
 
 export const findOnboardingInstanceById = async (id) => {
-    const instanceRes = await pool.query('SELECT * FROM onboarding_instances WHERE id = $1', [id]);
+    const instanceRes = await pool.query(
+        `SELECT oi.*, u.name as user_name, a.name as admin_name
+         FROM onboarding_instances oi
+         JOIN users u ON oi.user_id = u.id
+         JOIN users a ON oi.assigned_by = a.id
+         WHERE oi.id = $1`,
+        [id]
+    );
     if (instanceRes.rows.length === 0) {
         return null;
     }

@@ -57,11 +57,14 @@ const OnboardingTemplates = ({ taskTemplates, fetchTaskTemplates }) => {
 
     const handleOpenEditModal = async (template) => {
         setIsEditing(true);
-        setCurrentTemplate(template);
-        // In a real app, you would fetch the template details including its tasks
-        // For now, we'll assume the tasks are not pre-selected on edit for simplicity
-        setSelectedTasks([]); 
-        setModalOpen(true);
+        try {
+            const response = await api.get(`/templates/onboarding/${template.id}`);
+            setCurrentTemplate(response.data);
+            setSelectedTasks(response.data.tasks || []);
+            setModalOpen(true);
+        } catch (err) {
+            setError('Failed to fetch template details.');
+        }
     };
 
     const handleOpenDeleteDialog = (template) => {

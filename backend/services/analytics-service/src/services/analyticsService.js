@@ -4,10 +4,12 @@ export const getOnboardingKPIs = async () => {
     const avgCompletionTime = await AnalyticsModel.getAverageCompletionTime();
     const activeOnboardings = await AnalyticsModel.countActiveOnboardings();
     const completedOnboardings = await AnalyticsModel.countCompletedOnboardings();
+    const totalUsers = await AnalyticsModel.countTotalUsers();
 
     return {
         averageCompletionTimeHours: avgCompletionTime,
         activeOnboardings,
         completedOnboardings,
+        totalUsers,
     };
 };
