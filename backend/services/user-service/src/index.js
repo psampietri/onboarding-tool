@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
 import 'dotenv/config';
-import pool from '../../database/index.js';
+import pool from '../../../database/index.js';
 import authRoutes from './api/authRoutes.js';
 import userRoutes from './api/userRoutes.js';
 

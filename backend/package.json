@@ -21,6 +21,7 @@
     "start:onboarding-service": "npm start --workspace services/onboarding-service",
     "start:template-service": "npm start --workspace services/template-service",
     "start:user-service": "npm start --workspace services/user-service",
+    "start:all": "npm start --workspaces",
     "install:all": "npm install --workspaces"
   },
   "devDependencies": {
