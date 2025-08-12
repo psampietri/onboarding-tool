@@ -32,6 +32,25 @@ app.get('/', (req, res) => {
     res.json({ status: 'Analytics Service is running' });
 });
 
+app.get('/kpis', (req, res) => {
+  // Fetch and return KPIs
+  res.json({
+    activeUsers: 150,
+    completionRate: 85,
+    averageTime: '3d 4h',
+  });
+});
+
+app.get('/charts', (req, res) => {
+  // Fetch and return chart data
+  res.json([
+    { name: 'Jan', value: 400 },
+    { name: 'Feb', value: 300 },
+    { name: 'Mar', value: 600 },
+  ]);
+});
+
+
 app.listen(PORT, () => {
     console.log(`Analytics service is running on port ${PORT}`);
 });

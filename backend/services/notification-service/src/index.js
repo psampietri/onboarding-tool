@@ -29,6 +29,14 @@ app.get('/', (req, res) => {
     res.json({ status: 'Notification Service is running' });
 });
 
+app.get('/email/templates', (req, res) => {
+  // Fetch and return email templates
+  res.json([
+    { id: 1, name: 'Welcome Email', subject: 'Welcome to the Team!' },
+    { id: 2, name: 'Task Assignment', subject: 'You have a new task' },
+  ]);
+});
+
 app.listen(PORT, () => {
     console.log(`Notification service is running on port ${PORT}`);
 });

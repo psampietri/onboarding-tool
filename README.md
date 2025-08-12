@@ -17,9 +17,9 @@ This project is a complete solution for managing user onboarding and access requ
 
 1.  **Database Setup**:
     -   Make sure you have PostgreSQL installed and running.
-    -   Create a new database (e.g., `onboarding_db`).
-    -   Run the SQL script located in `/backend/shared/config/schema.sql` to create the necessary tables.
-    -   Update the database connection details in the `.env` files within each backend service directory if they differ from the defaults.
+    -   Create a new database.
+    -   Run the schema file located at `backend/database/schema.sql` to create the necessary tables.
+    -   Update the `.env` file in each backend service with your database credentials.
 
 2.  **Install All Dependencies**:
     -   A helper script is provided to install all `npm` dependencies for the backend and frontend at once.

@@ -45,21 +45,9 @@ app.use('/api/users', authenticateToken, createProxyMiddleware({ ...commonProxyO
 app.use('/api/templates', authenticateToken, createProxyMiddleware({ ...commonProxyOptions, target: services.template, pathRewrite: { '^/api/templates': '' } }));
 app.use('/api/onboarding', authenticateToken, createProxyMiddleware({ ...commonProxyOptions, target: services.onboarding, pathRewrite: { '^/api/onboarding': '' } }));
 app.use('/api/analytics', authenticateToken, createProxyMiddleware({ ...commonProxyOptions, target: services.analytics, pathRewrite: { '^/api/analytics': '' } }));
-
-// Add the new proxy route for the integration service
 app.use('/api/integrations', authenticateToken, createProxyMiddleware({ ...commonProxyOptions, target: services.integration, pathRewrite: { '^/api/integrations': '' } }));
-
-app.use('/api/notifications', authenticateToken, createProxyMiddleware({ 
-    ...commonProxyOptions, 
-    target: services.notification, 
-    pathRewrite: { '^/api/notifications': '/notifications' } 
-}));
-
-app.use('/api/audit', authenticateToken, createProxyMiddleware({ 
-    ...commonProxyOptions, 
-    target: services.analytics, 
-    pathRewrite: { '^/api/audit': '/audit' } 
-}));
+app.use('/api/notifications', authenticateToken, createProxyMiddleware({ ...commonProxyOptions, target: services.notification, pathRewrite: { '^/api/notifications': '' } }));
+app.use('/api/audit', authenticateToken, createProxyMiddleware({ ...commonProxyOptions, target: services.analytics, pathRewrite: { '^/api/audit': '' } }));
 
 app.listen(PORT, () => {
     console.log(`API Gateway listening on port ${PORT}`);

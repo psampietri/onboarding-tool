@@ -1,16 +1,17 @@
 import nodemailer from 'nodemailer';
+import 'dotenv/config';
 import * as NotificationModel from '../models/notificationModel.js';
 
 // Configure nodemailer (for a real implementation, use environment variables)
 let transporter;
 try {
     transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST || 'smtp.example.com',
-        port: process.env.SMTP_PORT || 587,
-        secure: process.env.SMTP_SECURE === 'true',
+        host: process.env.SMTP_HOST,
+        port: process.env.SMTP_PORT,
+        secure: process.env.SMTP_SECURE,
         auth: {
-            user: process.env.SMTP_USER || 'user@example.com',
-            pass: process.env.SMTP_PASSWORD || 'password'
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASSWORD
         }
     });
 } catch (error) {

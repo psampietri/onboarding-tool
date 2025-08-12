@@ -1,10 +1,13 @@
 import fetch from 'node-fetch';
+import 'dotenv/config';
 import * as OnboardingModel from '../models/onboardingModel.js';
+
+const USER_SERVICE_ENDPOINT = process.env.USER_SERVICE_ENDPOINT;
+const INTEGRATION_SERVICE_ENDPOINT = process.env.INTEGRATION_SERVICE_ENDPOINT;
 
 // Helper function to get user details from the user-service
 const getUserDetails = async (userId, token) => {
-    // This assumes the user-service is running on port 5001
-    const response = await fetch(`http://localhost:5001/users/${userId}`, {
+    const response = await fetch(`${USER_SERVICE_ENDPOINT}/users/${userId}`, {
         headers: { 'Authorization': token }
     });
     if (!response.ok) {
@@ -59,7 +62,7 @@ export const executeAutomatedTask = async (taskId, authToken) => {
     }
 
     // 4. Call the integration-service dynamically
-    const integrationServiceUrl = `http://localhost:5005/${platform}/requests`;
+    const integrationServiceUrl = `${INTEGRATION_SERVICE_ENDPOINT}/${platform}/requests`;
     const response = await fetch(integrationServiceUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

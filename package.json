@@ -1,0 +1,12 @@
+{
+  "name": "onboarding-tool",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Root package for the Onboarding Tool project",
+  "scripts": {
+    "start:backend": "concurrently \"npm --prefix backend/api-gateway start\" \"npm --prefix backend/services/user-service start\" \"npm --prefix backend/services/onboarding-service start\" \"npm --prefix backend/services/notification-service start\" \"npm --prefix backend/services/template-service start\" \"npm --prefix backend/services/integration-service start\" \"npm --prefix backend/services/analytics-service start\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
