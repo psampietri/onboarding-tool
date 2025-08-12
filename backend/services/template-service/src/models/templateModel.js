@@ -1,4 +1,4 @@
-import pool from 'database';
+import pool from '../../../../database/index.js';
 
 // --- Onboarding Templates ---
 
@@ -87,13 +87,13 @@ export const deleteOnboardingTemplate = async (id) => {
 
 // --- Task Templates ---
 
-export const createTaskTemplate = async ({ name, description, task_type, config, created_by, dependencies }) => {
+export const createTaskTemplate = async ({ name, description, instructions, task_type, config, created_by, dependencies }) => {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
         const { rows } = await client.query(
-            'INSERT INTO task_templates (name, description, task_type, config, created_by) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-            [name, description, task_type, config, created_by]
+            'INSERT INTO task_templates (name, description, instructions, task_type, config, created_by) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+            [name, description, instructions, task_type, config, created_by]
         );
         const newTemplate = rows[0];
 
@@ -137,13 +137,13 @@ export const findTaskTemplateById = async (id) => {
     return rows[0];
 };
 
-export const updateTaskTemplate = async (id, { name, description, task_type, config, dependencies }) => {
+export const updateTaskTemplate = async (id, { name, description, instructions, task_type, config, dependencies }) => {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
         const { rows } = await client.query(
-            'UPDATE task_templates SET name = $1, description = $2, task_type = $3, config = $4, updated_at = CURRENT_TIMESTAMP WHERE id = $5 RETURNING *',
-            [name, description, task_type, config, id]
+            'UPDATE task_templates SET name = $1, description = $2, instructions = $3, task_type = $4, config = $5, updated_at = CURRENT_TIMESTAMP WHERE id = $6 RETURNING *',
+            [name, description, instructions, task_type, config, id]
         );
         
         // Update dependencies
@@ -168,5 +168,6 @@ export const updateTaskTemplate = async (id, { name, description, task_type, con
 };
 
 export const deleteTaskTemplate = async (id) => {
-    await pool.query('DELETE FROM task_templates WHERE id = $1', [id]);
+    const result = await pool.query('DELETE FROM task_templates WHERE id = $1', [id]);
+    return result.rowCount; // Returns the number of rows deleted
 };

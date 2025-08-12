@@ -5,7 +5,7 @@ import jwt from 'jsonwebtoken';
 import 'dotenv/config';
 
 const app = express();
-const PORT = 5010;
+const PORT = process.env.PORT || 5010;
 const SECRET_KEY = process.env.SECRET_KEY;
 
 app.use(cors());
@@ -21,6 +21,7 @@ const services = {
 
 const commonProxyOptions = {
     changeOrigin: true,
+    proxyTimeout: 60000 // 60 seconds timeout
 };
 
 // Authentication middleware
@@ -31,7 +32,10 @@ const authenticateToken = (req, res, next) => {
     if (token == null) return res.sendStatus(401);
 
     jwt.verify(token, SECRET_KEY, (err, user) => {
-        if (err) return res.sendStatus(403);
+        if (err) {
+            console.error("JWT Verification Error:", err.message);
+            return res.sendStatus(403);
+        }
         req.user = user;
         next();
     });
@@ -41,16 +45,14 @@ const authenticateToken = (req, res, next) => {
 app.use('/api/auth', createProxyMiddleware({ ...commonProxyOptions, target: services.user, pathRewrite: { '^/api/auth': '' } }));
 
 // Protected routes
-app.use('/api/users/fields', authenticateToken, createProxyMiddleware({ ...commonProxyOptions, target: services.user, pathRewrite: { '^/api/users/fields': '/fields' } }));
 app.use('/api/users', authenticateToken, createProxyMiddleware({ ...commonProxyOptions, target: services.user, pathRewrite: { '^/api/users': '' } }));
 app.use('/api/templates', authenticateToken, createProxyMiddleware({ ...commonProxyOptions, target: services.template, pathRewrite: { '^/api/templates': '' } }));
 app.use('/api/onboarding', authenticateToken, createProxyMiddleware({ ...commonProxyOptions, target: services.onboarding, pathRewrite: { '^/api/onboarding': '' } }));
 app.use('/api/analytics', authenticateToken, createProxyMiddleware({ ...commonProxyOptions, target: services.analytics, pathRewrite: { '^/api/analytics': '' } }));
 app.use('/api/integrations', authenticateToken, createProxyMiddleware({ ...commonProxyOptions, target: services.integration, pathRewrite: { '^/api/integrations': '' } }));
-app.use('/api/notifications/user/:userId/unread', authenticateToken, createProxyMiddleware({ ...commonProxyOptions, target: services.notification, pathRewrite: { '^/api/notifications/user/:userId/unread': '' } }));
-app.use('/api/notifications/user/:userId', authenticateToken, createProxyMiddleware({ ...commonProxyOptions, target: services.notification, pathRewrite: { '^/api/notifications/user/:userId': '' } }));
 app.use('/api/notifications', authenticateToken, createProxyMiddleware({ ...commonProxyOptions, target: services.notification, pathRewrite: { '^/api/notifications': '' } }));
 app.use('/api/audit', authenticateToken, createProxyMiddleware({ ...commonProxyOptions, target: services.analytics, pathRewrite: { '^/api/audit': '' } }));
+
 
 app.listen(PORT, () => {
     console.log(`API Gateway listening on port ${PORT}`);

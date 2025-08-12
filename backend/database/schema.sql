@@ -24,6 +24,7 @@ CREATE TABLE task_templates (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     description TEXT,
+    instructions TEXT, -- Added this line
     task_type VARCHAR(50) NOT NULL CHECK (task_type IN ('manual', 'manual_access_request', 'automated_access_request')),
     config JSONB, -- For storing task-specific configuration
     created_by INTEGER REFERENCES users(id),
@@ -54,7 +55,7 @@ CREATE TABLE onboarding_instances (
 CREATE TABLE task_instances (
     id SERIAL PRIMARY KEY,
     onboarding_instance_id INTEGER REFERENCES onboarding_instances(id) ON DELETE CASCADE,
-    task_template_id INTEGER REFERENCES task_templates(id),
+    task_template_id INTEGER REFERENCES task_templates(id) ON DELETE CASCADE,
     status VARCHAR(50) NOT NULL DEFAULT 'not_started' CHECK (status IN ('not_started', 'in_progress', 'completed', 'blocked')),
     ticket_info JSONB, -- For manual access request ticket details
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,

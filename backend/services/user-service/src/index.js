@@ -7,7 +7,7 @@ import authRoutes from './api/authRoutes.js';
 import userRoutes from './api/userRoutes.js';
 
 const app = express();
-const PORT = 5001;
+const PORT = process.env.PORT || 5001;
 
 // Standard middleware setup
 app.use(cors());

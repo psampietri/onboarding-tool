@@ -1,77 +1,68 @@
-import fetch from 'node-fetch';
+import axios from 'axios';
+import 'dotenv/config';
 
-// Helper function to get the correct configuration from environment variables
-const getPlatformConfig = (configKey) => {
-    const baseUrl = process.env[`${configKey}_BASE_URL`];
-    const apiToken = process.env[`${configKey}_API_TOKEN`];
+const JIRA_BASE_URL = process.env.JIRA_BASE_URL;
+const JIRA_API_TOKEN = process.env.JIRA_API_TOKEN;
+const JIRA_USER_EMAIL = process.env.JIRA_USER_EMAIL;
 
-    if (!baseUrl || !apiToken) {
-        throw new Error(`Configuration for key "${configKey}" not found in .env file.`);
-    }
+const jiraApi = axios.create({
+    baseURL: JIRA_BASE_URL,
+    headers: {
+        'Authorization': `Basic ${Buffer.from(`${JIRA_USER_EMAIL}:${JIRA_API_TOKEN}`).toString('base64')}`,
+        'Content-Type': 'application/json',
+    },
+});
 
-    return { baseUrl, apiToken };
+export const getServiceDesks = async (platform, configKey) => {
+    const response = await jiraApi.get('/rest/servicedeskapi/servicedesk');
+    return response.data;
 };
 
-// Generic function to make API calls to a platform
-const callPlatformApi = async (configKey, endpoint, method = 'GET', body = null) => {
-    const { baseUrl, apiToken } = getPlatformConfig(configKey);
-    const url = `${baseUrl}${endpoint}`;
+export const getRequestTypes = async (platform, configKey, serviceDeskId) => {
+    const response = await jiraApi.get(`/rest/servicedeskapi/servicedesk/${serviceDeskId}/requesttype`);
+    return response.data;
+};
 
-    console.log(`[integration-service] Making API call: ${method} ${url}`);
+export const getRequestTypeFields = async (platform, configKey, serviceDeskId, requestTypeId) => {
+    const response = await jiraApi.get(`/rest/servicedeskapi/servicedesk/${serviceDeskId}/requesttype/${requestTypeId}/field`);
+    return response.data;
+};
 
-    try {
-        const options = {
-            method,
-            headers: {
-                'Authorization': `Bearer ${apiToken}`,
-                'Content-Type': 'application/json'
+export const prepareJiraTicketPayload = (jiraConfig, user) => {
+    const { serviceDeskId, requestTypeId, fieldMappings } = jiraConfig;
+    const requestFieldValues = {};
+
+    for (const fieldId in fieldMappings) {
+        const mapping = fieldMappings[fieldId];
+        if (mapping.type === 'static') {
+            requestFieldValues[fieldId] = mapping.value;
+        } else if (mapping.type === 'dynamic' && user[mapping.value]) {
+            // Jira's reporter field often requires an object with emailAddress
+            if (fieldId === 'reporter') {
+                requestFieldValues[fieldId] = { emailAddress: user[mapping.value] };
+            } else {
+                requestFieldValues[fieldId] = user[mapping.value];
             }
-        };
-
-        if (body) {
-            options.body = JSON.stringify(body);
         }
-
-        const response = await fetch(url, options);
-
-        if (!response.ok) {
-            const errorBody = await response.text();
-            console.error(`[integration-service] API Error Response: ${errorBody}`);
-            throw new Error(`API request failed with status ${response.status}`);
-        }
-
-        // Handle responses with no content
-        if (response.status === 204) {
-            return null;
-        }
-
-        return response.json();
-    } catch (error) {
-        console.error(`[integration-service] FATAL: A network or fetch error occurred.`, error);
-        throw error;
     }
-};
 
-// --- Service Functions ---
+    // Add summary and description as required by many Jira setups
+    if (!requestFieldValues.summary) {
+        requestFieldValues.summary = `Onboarding Task: Access for ${user.name}`;
+    }
+    if (!requestFieldValues.description) {
+        requestFieldValues.description = `Automated access request for ${user.name} (${user.email}).`;
+    }
 
-export const getServiceDesks = async (configKey) => {
-    return await callPlatformApi(configKey, '/rest/servicedeskapi/servicedesk');
-};
-
-export const getRequestTypes = async (configKey, serviceDeskId) => {
-    return await callPlatformApi(configKey, `/rest/servicedeskapi/servicedesk/${serviceDeskId}/requesttype`);
-};
-
-export const getRequestTypeFields = async (configKey, serviceDeskId, requestTypeId) => {
-    return await callPlatformApi(configKey, `/rest/servicedeskapi/servicedesk/${serviceDeskId}/requesttype/${requestTypeId}/field`);
-};
-
-export const createJiraTicket = async (configKey, serviceDeskId, requestTypeId, requestFieldValues) => {
-    const endpoint = '/rest/servicedeskapi/request';
-    const body = {
+    return {
         serviceDeskId,
         requestTypeId,
-        requestFieldValues,
+        requestFieldValues
     };
-    return await callPlatformApi(configKey, endpoint, 'POST', body);
+};
+
+export const createJiraTicket = async (jiraConfig, user) => {
+    const payload = prepareJiraTicketPayload(jiraConfig, user);
+    const response = await jiraApi.post('/rest/servicedeskapi/request', payload);
+    return response.data;
 };

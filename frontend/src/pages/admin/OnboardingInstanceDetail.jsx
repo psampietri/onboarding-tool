@@ -1,11 +1,12 @@
 // frontend/src/pages/admin/OnboardingInstanceDetail.jsx
 import React, { useState, useEffect, useMemo } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
     Container, Typography, Paper, Box, CircularProgress, Alert,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Chip,
     FormControl, Select, MenuItem, Button, Tooltip, Grid, Card, CardContent,
-    LinearProgress, Stack, Divider, List, ListItem, ListItemText, ListItemIcon
+    LinearProgress, Stack, Divider, List, ListItem, ListItemText, ListItemIcon,
+    Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, InputLabel, Modal
 } from '@mui/material';
 import LockIcon from '@mui/icons-material/Lock';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -13,22 +14,37 @@ import ErrorIcon from '@mui/icons-material/Error';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import IconButton from '@mui/material/IconButton';
-import Timeline from '@mui/lab/Timeline';
-import TimelineItem from '@mui/lab/TimelineItem';
-import TimelineSeparator from '@mui/lab/TimelineSeparator';
-import TimelineConnector from '@mui/lab/TimelineConnector';
-import TimelineContent from '@mui/lab/TimelineContent';
-import TimelineDot from '@mui/lab/TimelineDot';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import { TreeView, TreeItem } from '@mui/lab';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import api from '../../services/api';
-import { executeAutomatedTask } from '../../services/onboardingService';
+import { executeAutomatedTask, dryRunAutomatedTask, updateOnboardingInstance, deleteOnboardingInstance } from '../../services/onboardingService';
+
+const style = {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    width: 600,
+    bgcolor: 'background.paper',
+    border: '2px solid #000',
+    boxShadow: 24,
+    p: 4,
+};
 
 const OnboardingInstanceDetail = () => {
     const { instanceId } = useParams();
+    const navigate = useNavigate();
     const [instance, setInstance] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [taskLoading, setTaskLoading] = useState(null);
-    const [activeTab, setActiveTab] = useState('table'); // 'table', 'timeline', 'kanban'
+    const [activeTab, setActiveTab] = useState('table'); // 'table', 'timeline', 'kanban', 'tree'
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [dryRunModalOpen, setDryRunModalOpen] = useState(false);
+    const [dryRunResult, setDryRunResult] = useState(null);
+    const [taskTree, setTaskTree] = useState([]);
 
     const fetchInstanceDetails = async () => {
         try {
@@ -47,12 +63,56 @@ const OnboardingInstanceDetail = () => {
         fetchInstanceDetails();
     }, [instanceId]);
 
+    useEffect(() => {
+        if (instance?.tasks) {
+            const buildTaskTree = (tasks) => {
+                const tasksMap = new Map(tasks.map(task => [task.task_template_id, task]));
+                const adjacencyList = new Map();
+
+                tasks.forEach(task => {
+                    if (task.dependencies && task.dependencies.length > 0) {
+                        task.dependencies.forEach(depId => {
+                            if (!adjacencyList.has(depId)) {
+                                adjacencyList.set(depId, []);
+                            }
+                            adjacencyList.get(depId).push(task.task_template_id);
+                        });
+                    }
+                });
+
+                const buildNode = (taskId) => {
+                    const taskData = tasksMap.get(taskId);
+                    const childrenIds = adjacencyList.get(taskId) || [];
+                    return {
+                        ...taskData,
+                        children: childrenIds.map(childId => buildNode(childId))
+                    };
+                };
+
+                const rootTasks = tasks.filter(task => !task.dependencies || task.dependencies.length === 0);
+                return rootTasks.map(task => buildNode(task.task_template_id));
+            };
+            setTaskTree(buildTaskTree(instance.tasks));
+        }
+    }, [instance]);
+
     const handleStatusChange = async (taskId, newStatus) => {
         try {
             await api.put(`/onboarding/tasks/${taskId}`, { status: newStatus });
             fetchInstanceDetails();
         } catch (err) {
             setError('Failed to update task status.');
+            console.error(err);
+        }
+    };
+
+    const handleInstanceStatusChange = async (e) => {
+        const newStatus = e.target.value;
+        try {
+            await updateOnboardingInstance(instanceId, { status: newStatus });
+            setInstance(prev => ({ ...prev, status: newStatus }));
+        } catch (err) {
+            setError('Failed to update instance status.');
             console.error(err);
         }
     };
@@ -71,7 +131,39 @@ const OnboardingInstanceDetail = () => {
         }
     };
 
-    // Memoize the calculation of blocked tasks
+    const handleDryRun = async (taskId) => {
+        setTaskLoading(taskId);
+        setError('');
+        try {
+            const result = await dryRunAutomatedTask(taskId);
+            setDryRunResult(result);
+            setDryRunModalOpen(true);
+        } catch (err) {
+            setError('Failed to perform dry run.');
+            console.error(err);
+        } finally {
+            setTaskLoading(null);
+        }
+    };
+
+    const handleOpenDeleteDialog = () => {
+        setDeleteDialogOpen(true);
+    };
+
+    const handleCloseDeleteDialog = () => {
+        setDeleteDialogOpen(false);
+    };
+
+    const handleDelete = async () => {
+        try {
+            await deleteOnboardingInstance(instanceId);
+            navigate('/admin/dashboard');
+        } catch (err) {
+            setError('Failed to delete onboarding instance.');
+            console.error(err);
+        }
+    };
+
     const blockedTasks = useMemo(() => {
         if (!instance?.tasks) return new Set();
         
@@ -91,14 +183,12 @@ const OnboardingInstanceDetail = () => {
         return blocked;
     }, [instance]);
 
-    // Calculate overall progress
     const progress = useMemo(() => {
         if (!instance?.tasks || instance.tasks.length === 0) return 0;
         const completed = instance.tasks.filter(task => task.status === 'completed').length;
         return (completed / instance.tasks.length) * 100;
     }, [instance]);
 
-    // Group tasks by status
     const tasksByStatus = useMemo(() => {
         if (!instance?.tasks) return {};
         return instance.tasks.reduce((acc, task) => {
@@ -126,6 +216,29 @@ const OnboardingInstanceDetail = () => {
         }
     };
 
+    const renderTree = (nodes, prefix = 'root') => (
+        nodes.map((node, index) => {
+            const nodeId = `${prefix}-${node.id}-${index}`;
+            return (
+                <TreeItem 
+                    key={nodeId}
+                    nodeId={nodeId}
+                    label={
+                        <Box sx={{ display: 'flex', alignItems: 'center', p: 0.5 }}>
+                            {getStatusIcon(node.status)}
+                            <Typography sx={{ ml: 1, flexGrow: 1 }}>{node.name}</Typography>
+                            <Chip label={node.status} color={getStatusChipColor(node.status)} size="small" />
+                        </Box>
+                    }
+                >
+                    {Array.isArray(node.children) && node.children.length > 0
+                        ? renderTree(node.children, nodeId)
+                        : null}
+                </TreeItem>
+            );
+        })
+    );
+
     if (loading) {
         return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}><CircularProgress /></Box>;
     }
@@ -151,7 +264,18 @@ const OnboardingInstanceDetail = () => {
                         <Paper sx={{ p: 3 }}>
                             <Typography variant="h6" gutterBottom>Onboarding Summary</Typography>
                             <Typography><strong>User:</strong> {instance.user_name}</Typography>
-                            <Typography><strong>Status:</strong> {instance.status}</Typography>
+                            <FormControl fullWidth margin="normal" size="small">
+                                <InputLabel>Status</InputLabel>
+                                <Select
+                                    value={instance.status}
+                                    label="Status"
+                                    onChange={handleInstanceStatusChange}
+                                >
+                                    <MenuItem value="not_started">Not Started</MenuItem>
+                                    <MenuItem value="in_progress">In Progress</MenuItem>
+                                    <MenuItem value="completed">Completed</MenuItem>
+                                </Select>
+                            </FormControl>
                             <Typography><strong>Assigned By:</strong> {instance.admin_name}</Typography>
                             <Typography><strong>Start Date:</strong> {new Date(instance.created_at).toLocaleString()}</Typography>
                             
@@ -165,6 +289,9 @@ const OnboardingInstanceDetail = () => {
                                 <Typography variant="caption" align="right" display="block" sx={{ mt: 0.5 }}>
                                     {Math.round(progress)}% Complete
                                 </Typography>
+                            </Box>
+                            <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
+                                <Button color="error" onClick={handleOpenDeleteDialog}>Delete Instance</Button>
                             </Box>
                         </Paper>
                     </Grid>
@@ -236,6 +363,13 @@ const OnboardingInstanceDetail = () => {
                     >
                         Kanban View
                     </Button>
+                    <Button 
+                        variant={activeTab === 'tree' ? 'contained' : 'text'} 
+                        onClick={() => setActiveTab('tree')}
+                        sx={{ mx: 1 }}
+                    >
+                        Tree View
+                    </Button>
                 </Box>
             </Paper>
             
@@ -256,7 +390,23 @@ const OnboardingInstanceDetail = () => {
                                 const isBlocked = blockedTasks.has(task.id);
                                 return (
                                     <TableRow key={task.id} sx={{ opacity: isBlocked ? 0.6 : 1 }}>
-                                        <TableCell>{task.name}</TableCell>
+                                        <TableCell>
+                                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                                {task.name}
+                                                {task.instructions && (
+                                                    <Tooltip title={task.instructions}>
+                                                        <IconButton size="small" sx={{ ml: 1 }}>
+                                                            <InfoOutlinedIcon fontSize="small" />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                )}
+                                            </Box>
+                                            {task.ticket_info && (
+                                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                                                    Ticket: <a href={task.ticket_info.self} target="_blank" rel="noopener noreferrer">{task.ticket_info.key}</a>
+                                                </Typography>
+                                            )}
+                                        </TableCell>
                                         <TableCell>{task.task_type}</TableCell>
                                         <TableCell>
                                             <FormControl size="small" sx={{ minWidth: 120 }} disabled={isBlocked}>
@@ -281,14 +431,25 @@ const OnboardingInstanceDetail = () => {
                                                 </Tooltip>
                                             )}
                                             {task.task_type === 'automated_access_request' && task.status === 'not_started' && !isBlocked && (
-                                                <Button
-                                                    variant="contained"
-                                                    size="small"
-                                                    onClick={() => handleExecuteTask(task.id)}
-                                                    disabled={taskLoading === task.id}
-                                                >
-                                                    {taskLoading === task.id ? <CircularProgress size={20} /> : 'Run Automation'}
-                                                </Button>
+                                                <>
+                                                    <Button
+                                                        variant="outlined"
+                                                        size="small"
+                                                        onClick={() => handleDryRun(task.id)}
+                                                        disabled={taskLoading === task.id}
+                                                        sx={{ mr: 1 }}
+                                                    >
+                                                        Dry Run
+                                                    </Button>
+                                                    <Button
+                                                        variant="contained"
+                                                        size="small"
+                                                        onClick={() => handleExecuteTask(task.id)}
+                                                        disabled={taskLoading === task.id}
+                                                    >
+                                                        {taskLoading === task.id ? <CircularProgress size={20} /> : 'Run'}
+                                                    </Button>
+                                                </>
                                             )}
                                         </TableCell>
                                     </TableRow>
@@ -466,6 +627,46 @@ const OnboardingInstanceDetail = () => {
                     </Grid>
                 </Grid>
             )}
+
+            {/* Tree View */}
+            {activeTab === 'tree' && (
+                <Paper sx={{ p: 2 }}>
+                    <TreeView
+                        defaultCollapseIcon={<ExpandMoreIcon />}
+                        defaultExpandIcon={<ChevronRightIcon />}
+                        sx={{ flexGrow: 1, overflowY: 'auto' }}
+                    >
+                        {renderTree(taskTree)}
+                    </TreeView>
+                </Paper>
+            )}
+
+            <Dialog open={deleteDialogOpen} onClose={handleCloseDeleteDialog}>
+                <DialogTitle>Delete Onboarding Instance</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        Are you sure you want to delete this onboarding instance? This action cannot be undone.
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleCloseDeleteDialog}>Cancel</Button>
+                    <Button onClick={handleDelete} color="error">Delete</Button>
+                </DialogActions>
+            </Dialog>
+
+            <Modal open={dryRunModalOpen} onClose={() => setDryRunModalOpen(false)}>
+                <Box sx={style}>
+                    <Typography variant="h6" component="h2">Dry Run Result</Typography>
+                    {dryRunResult && (
+                        <>
+                            <Typography sx={{ mt: 2 }}>{dryRunResult.message}</Typography>
+                            <Paper variant="outlined" sx={{ p: 2, mt: 1, maxHeight: 400, overflow: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                                <pre>{JSON.stringify(dryRunResult.payload, null, 2)}</pre>
+                            </Paper>
+                        </>
+                    )}
+                </Box>
+            </Modal>
         </Container>
     );
 };

@@ -5,7 +5,7 @@ import pool from '../../../database/index.js';
 import onboardingRoutes from './api/onboardingRoutes.js';
 
 const app = express();
-const PORT = 5003;
+const PORT = process.env.PORT || 5003;
 
 app.use(cors());
 app.use(express.json());

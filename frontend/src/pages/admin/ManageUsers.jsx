@@ -222,25 +222,46 @@ const ManageUsers = () => {
                     <Typography variant="h6" component="h2">
                         {isEditing ? 'Edit User' : 'Create New User'}
                     </Typography>
-                    {userFields.map(field => {
-                        if (['id', 'created_at', 'updated_at'].includes(field)) return null;
-                        const isPassword = field.includes('password');
-                        if (isEditing && isPassword) return null; // Don't show password on edit
+                    
+                    {userFields.filter(field => !['id', 'created_at', 'updated_at', 'role'].includes(field)).map(field => (
+                        <TextField
+                            key={field}
+                            margin="normal"
+                            required={!isEditing || ['name', 'email'].includes(field)}
+                            fullWidth
+                            label={field.charAt(0).toUpperCase() + field.slice(1)}
+                            name={field}
+                            value={currentUser?.[field] || ''}
+                            onChange={handleInputChange}
+                        />
+                    ))}
 
-                        return (
-                            <TextField 
-                                key={field}
-                                margin="normal" 
-                                required={!isEditing || field === 'name' || field === 'email'}
-                                fullWidth 
-                                label={field}
-                                name={field} 
-                                type={isPassword ? 'password' : 'text'}
-                                value={currentUser?.[field] || ''} 
-                                onChange={handleInputChange} 
-                            />
-                        )
-                    })}
+                    {!isEditing && (
+                        <TextField
+                            margin="normal"
+                            required
+                            fullWidth
+                            label="Password"
+                            name="password"
+                            type="password"
+                            value={currentUser?.password || ''}
+                            onChange={handleInputChange}
+                        />
+                    )}
+
+                    <FormControl fullWidth margin="normal">
+                        <InputLabel>Role</InputLabel>
+                        <Select
+                            name="role"
+                            value={currentUser?.role || 'user'}
+                            label="Role"
+                            onChange={handleInputChange}
+                        >
+                            <MenuItem value="user">User</MenuItem>
+                            <MenuItem value="admin">Admin</MenuItem>
+                        </Select>
+                    </FormControl>
+                    
                     <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
                         <Button onClick={handleCloseModal} sx={{ mr: 1 }}>Cancel</Button>
                         <Button type="submit" variant="contained">Save</Button>

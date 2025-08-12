@@ -96,7 +96,7 @@ const AdminDashboard = () => {
     const fetchData = async () => {
         try {
             setLoading(true);
-            const [instancesRes, usersRes, templatesRes, kpisRes, analyticsRes] = await Promise.all([
+            const [instancesRes, usersRes, templatesRes, kpisRes, chartsRes] = await Promise.all([
                 api.get('/onboarding/instances'),
                 api.get('/users'),
                 api.get('/templates/onboarding'),
@@ -110,10 +110,9 @@ const AdminDashboard = () => {
             setUsers(usersRes.data);
             setTemplates(templatesRes.data);
             
-            // Format average completion time
             let avgTime = 'N/A';
-            if (kpisRes.data.averageCompletionTimeHours) {
-                const { days, hours } = kpisRes.data.averageCompletionTimeHours;
+            if (kpisRes.data.averageCompletionTime) {
+                const { days, hours } = kpisRes.data.averageCompletionTime;
                 avgTime = `${days || 0}d ${hours || 0}h`;
             }
 
@@ -124,44 +123,7 @@ const AdminDashboard = () => {
                 completionRate: kpisRes.data.completionRate || 0
             });
             
-            // Process analytics data for charts
-            // Note: In a real application, this data would come from the analyticsRes
-            // Here we're simulating it based on the instances data we have
-            
-            // For demo purposes, let's create some mock chart data
-            const mockTaskTypeDistribution = [
-                { name: 'Manual', value: 35 },
-                { name: 'Manual Access', value: 40 },
-                { name: 'Automated', value: 25 },
-            ];
-            
-            // Generate completion trend data for the last 14 days
-            const trendData = [];
-            for (let i = 13; i >= 0; i--) {
-                const date = subDays(new Date(), i);
-                trendData.push({
-                    date: format(date, 'MMM dd'),
-                    completed: Math.floor(Math.random() * 5), // Random number 0-5
-                    started: Math.floor(Math.random() * 8), // Random number 0-8
-                });
-            }
-            
-            // Calculate status distribution from instances
-            const statusCounts = instancesData.reduce((acc, instance) => {
-                acc[instance.status] = (acc[instance.status] || 0) + 1;
-                return acc;
-            }, {});
-            
-            const statusDistribution = Object.keys(statusCounts).map(status => ({
-                name: status,
-                value: statusCounts[status]
-            }));
-            
-            setChartData({
-                taskTypeDistribution: mockTaskTypeDistribution,
-                completionTrend: trendData,
-                statusDistribution: statusDistribution
-            });
+            setChartData(chartsRes.data);
             
         } catch (err) {
             setError('Failed to load dashboard data.');
@@ -179,7 +141,6 @@ const AdminDashboard = () => {
     useEffect(() => {
         let filtered = [...instances];
         
-        // Apply search filter
         if (searchTerm) {
             const term = searchTerm.toLowerCase();
             filtered = filtered.filter(inst => 
@@ -189,7 +150,6 @@ const AdminDashboard = () => {
             );
         }
         
-        // Apply status filter
         if (statusFilter !== 'all') {
             filtered = filtered.filter(inst => inst.status === statusFilter);
         }
@@ -261,8 +221,6 @@ const AdminDashboard = () => {
                         title="Active Onboardings" 
                         value={stats.activeOnboardings} 
                         icon={<AssignmentIcon color="primary" sx={{ fontSize: 40 }} />} 
-                        trend="up"
-                        trendValue="12%"
                     />
                 </Grid>
                 <Grid xs={12} md={3}>
@@ -277,8 +235,6 @@ const AdminDashboard = () => {
                         title="Avg. Completion Time" 
                         value={stats.avgCompletionDays} 
                         icon={<BarChartIcon color="success" sx={{ fontSize: 40 }} />} 
-                        trend="down"
-                        trendValue="8%"
                     />
                 </Grid>
                 <Grid xs={12} md={3}>
@@ -295,14 +251,13 @@ const AdminDashboard = () => {
                 <Tabs value={tabValue} onChange={handleTabChange} sx={{ mb: 2 }}>
                     <Tab label="Overview" />
                     <Tab label="Task Analysis" />
-                    <Tab label="Trends" />
                 </Tabs>
 
                 {/* Overview Tab */}
                 {tabValue === 0 && (
                     <Grid container spacing={3}>
                         <Grid xs={12} md={8}>
-                            <Typography variant="h6" gutterBottom>Onboarding Completion Trend</Typography>
+                            <Typography variant="h6" gutterBottom>Onboarding Trend (Last 14 Days)</Typography>
                             <Paper sx={{ p: 2, height: 300 }}>
                                 <ResponsiveContainer width="100%" height="100%">
                                     <LineChart data={chartData.completionTrend}>
@@ -348,77 +303,18 @@ const AdminDashboard = () => {
                 {/* Task Analysis Tab */}
                 {tabValue === 1 && (
                     <Grid container spacing={3}>
-                        <Grid xs={12} md={6}>
+                        <Grid xs={12}>
                             <Typography variant="h6" gutterBottom>Task Type Distribution</Typography>
                             <Paper sx={{ p: 2, height: 300 }}>
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <PieChart>
-                                        <Pie
-                                            data={chartData.taskTypeDistribution}
-                                            cx="50%"
-                                            cy="50%"
-                                            labelLine={false}
-                                            outerRadius={80}
-                                            fill="#8884d8"
-                                            dataKey="value"
-                                            nameKey="name"
-                                            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                                        >
-                                            {chartData.taskTypeDistribution.map((entry, index) => (
-                                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                            ))}
-                                        </Pie>
-                                        <RechartsTooltip />
-                                    </PieChart>
-                                </ResponsiveContainer>
-                            </Paper>
-                        </Grid>
-                        <Grid xs={12} md={6}>
-                            <Typography variant="h6" gutterBottom>Task Completion Time by Type</Typography>
-                            <Paper sx={{ p: 2, height: 300 }}>
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart
-                                        data={[
-                                            { name: 'Manual', time: 2.5 },
-                                            { name: 'Manual Access', time: 5.3 },
-                                            { name: 'Automated', time: 0.3 }
-                                        ]}
-                                    >
+                                    <BarChart data={chartData.taskTypeDistribution}>
                                         <CartesianGrid strokeDasharray="3 3" />
                                         <XAxis dataKey="name" />
-                                        <YAxis label={{ value: 'Days', angle: -90, position: 'insideLeft' }} />
+                                        <YAxis />
                                         <RechartsTooltip />
-                                        <Bar dataKey="time" fill="#8884d8" />
+                                        <Legend />
+                                        <Bar dataKey="value" fill="#8884d8" name="Number of Tasks" />
                                     </BarChart>
-                                </ResponsiveContainer>
-                            </Paper>
-                        </Grid>
-                    </Grid>
-                )}
-
-                {/* Trends Tab */}
-                {tabValue === 2 && (
-                    <Grid container spacing={3}>
-                        <Grid xs={12}>
-                            <Typography variant="h6" gutterBottom>Weekly Completion Rate</Typography>
-                            <Paper sx={{ p: 2, height: 300 }}>
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <LineChart
-                                        data={[
-                                            { week: 'Week 1', rate: 65 },
-                                            { week: 'Week 2', rate: 72 },
-                                            { week: 'Week 3', rate: 68 },
-                                            { week: 'Week 4', rate: 78 },
-                                            { week: 'Week 5', rate: 82 },
-                                            { week: 'Week 6', rate: 85 }
-                                        ]}
-                                    >
-                                        <CartesianGrid strokeDasharray="3 3" />
-                                        <XAxis dataKey="week" />
-                                        <YAxis label={{ value: 'Completion %', angle: -90, position: 'insideLeft' }} />
-                                        <RechartsTooltip />
-                                        <Line type="monotone" dataKey="rate" stroke="#8884d8" strokeWidth={2} />
-                                    </LineChart>
                                 </ResponsiveContainer>
                             </Paper>
                         </Grid>

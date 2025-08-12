@@ -12,4 +12,14 @@ router.get('/kpis', async (req, res) => {
     }
 });
 
+router.get('/charts', async (req, res) => {
+    try {
+        const chartData = await AnalyticsService.getChartData();
+        res.json(chartData);
+    } catch (error) {
+        console.error('Error fetching chart data:', error);
+        res.status(500).json({ error: 'Failed to retrieve chart data.' });
+    }
+});
+
 export default router;

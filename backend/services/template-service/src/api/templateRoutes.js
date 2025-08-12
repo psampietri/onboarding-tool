@@ -75,10 +75,14 @@ router.put('/tasks/:id', async (req, res) => {
 
 router.delete('/tasks/:id', async (req, res) => {
     try {
-        await TemplateService.deleteTaskTemplate(req.params.id);
+        const deletedCount = await TemplateService.deleteTaskTemplate(req.params.id);
+        if (deletedCount === 0) {
+            return res.status(404).json({ error: 'Task template not found.' });
+        }
         res.status(204).send();
     } catch (error) {
-        res.status(500).json({ error: 'Failed to delete template.' });
+        console.error('Error deleting task template:', error);
+        res.status(500).json({ error: 'Failed to delete template.', details: error.message });
     }
 });
 

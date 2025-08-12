@@ -1,4 +1,4 @@
-import pool from 'database';
+import pool from '../../../../database/index.js';
 
 export const createOnboardingInstance = async (userId, templateId, assignedBy) => {
     const client = await pool.connect();
@@ -63,8 +63,10 @@ export const findOnboardingInstanceById = async (id) => {
         `SELECT 
             ti.*, 
             tt.name, 
-            tt.description, 
+            tt.description,
+            tt.instructions, 
             tt.task_type,
+            tt.config,
             COALESCE(deps.dependencies, '[]'::json) as dependencies
          FROM task_instances ti
          JOIN task_templates tt ON ti.task_template_id = tt.id
@@ -83,12 +85,32 @@ export const findOnboardingInstanceById = async (id) => {
     return instance;
 };
 
+export const findTaskInstanceById = async (id) => {
+    const { rows } = await pool.query(
+        `SELECT 
+            ti.*, 
+            oi.user_id,
+            tt.name, 
+            tt.description,
+            tt.instructions, 
+            tt.task_type,
+            tt.config
+         FROM task_instances ti
+         JOIN task_templates tt ON ti.task_template_id = tt.id
+         JOIN onboarding_instances oi ON ti.onboarding_instance_id = oi.id
+         WHERE ti.id = $1`,
+        [id]
+    );
+    return rows[0];
+};
+
 export const findTasksByUserId = async (userId) => {
     const { rows } = await pool.query(
         `SELECT 
             ti.*, 
             tt.name, 
-            tt.description, 
+            tt.description,
+            tt.instructions,
             tt.task_type,
             COALESCE(deps.dependencies, '[]'::json) as dependencies
          FROM task_instances ti
@@ -113,4 +135,16 @@ export const updateTaskInstance = async (taskId, status, ticketInfo) => {
         [status, ticketInfo, taskId]
     );
     return rows[0];
+};
+
+export const updateOnboardingInstance = async (id, { status }) => {
+    const { rows } = await pool.query(
+        'UPDATE onboarding_instances SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
+        [status, id]
+    );
+    return rows[0];
+};
+
+export const deleteOnboardingInstance = async (id) => {
+    await pool.query('DELETE FROM onboarding_instances WHERE id = $1', [id]);
 };

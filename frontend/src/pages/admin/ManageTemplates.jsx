@@ -3,7 +3,7 @@ import {
     Container, Typography, Paper, TableContainer, Table, TableHead,
     TableRow, TableCell, TableBody, CircularProgress, Box, Alert, Button,
     Modal, TextField, FormControl, InputLabel, Select, MenuItem, IconButton,
-    List, ListItem, ListItemText, Checkbox, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Grid, Chip
+    Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, List, ListItem, ListItemText, Checkbox, Grid, Chip
 } from '@mui/material';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import EditIcon from '@mui/icons-material/Edit';
@@ -271,7 +271,7 @@ const TaskTemplates = ({ taskTemplates, fetchTaskTemplates }) => {
 
     const handleOpenCreateModal = () => {
         setIsEditing(false);
-        setCurrentTemplate({ name: '', description: '', task_type: 'manual', config: '{}', dependencies: [] });
+        setCurrentTemplate({ name: '', description: '', instructions: '', task_type: 'manual', config: '{}', dependencies: [] });
         setSelectedServiceDesk('');
         setSelectedRequestType('');
         setJiraFields([]);
@@ -432,6 +432,7 @@ const TaskTemplates = ({ taskTemplates, fetchTaskTemplates }) => {
                     <Typography variant="h6" component="h2">{isEditing ? 'Edit' : 'Create New'} Task Template</Typography>
                     <TextField margin="normal" required fullWidth label="Template Name" name="name" value={currentTemplate?.name || ''} onChange={handleInputChange} />
                     <TextField margin="normal" fullWidth label="Description" name="description" value={currentTemplate?.description || ''} onChange={handleInputChange} />
+                    <TextField margin="normal" fullWidth label="Instructions" name="instructions" multiline rows={3} value={currentTemplate?.instructions || ''} onChange={handleInputChange} />
                     <FormControl fullWidth margin="normal">
                         <InputLabel>Task Type</InputLabel>
                         <Select name="task_type" value={currentTemplate?.task_type || 'manual'} label="Task Type" onChange={handleInputChange}>
@@ -484,11 +485,13 @@ const TaskTemplates = ({ taskTemplates, fetchTaskTemplates }) => {
                                 <Box sx={{ mt: 2 }}>
                                     <Typography>Map Jira Fields:</Typography>
                                     {jiraFields.filter(f => f.required).map(field => (
-                                        <Grid container spacing={1} key={field.fieldId} alignItems="center" sx={{mt: 1}}>
+                                        <Grid container spacing={2} key={field.fieldId} alignItems="center" sx={{mt: 1}}>
                                             <Grid item xs={12} sm={4}>
-                                                <Typography variant="body2" title={field.name}>{field.name}</Typography>
+                                                <Typography variant="body2" title={field.name} noWrap>
+                                                    {field.name}
+                                                </Typography>
                                             </Grid>
-                                            <Grid item xs={6} sm={3}>
+                                            <Grid item xs={6} sm={4}>
                                                 <FormControl fullWidth size="small">
                                                     <InputLabel>Type</InputLabel>
                                                     <Select
@@ -501,7 +504,7 @@ const TaskTemplates = ({ taskTemplates, fetchTaskTemplates }) => {
                                                     </Select>
                                                 </FormControl>
                                             </Grid>
-                                            <Grid item xs={6} sm={5}>
+                                            <Grid item xs={6} sm={4}>
                                                 {fieldMappings[field.fieldId]?.type === 'static' ? (
                                                     renderStaticInput(field)
                                                 ) : (
@@ -530,6 +533,19 @@ const TaskTemplates = ({ taskTemplates, fetchTaskTemplates }) => {
                     </Box>
                 </Box>
             </Modal>
+
+            <Dialog open={dialogOpen} onClose={handleCloseDialog}>
+                <DialogTitle>Delete Task Template</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        Are you sure you want to delete the template "{currentTemplate?.name}"? This cannot be undone.
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleCloseDialog}>Cancel</Button>
+                    <Button onClick={handleDeleteTemplate} color="error">Delete</Button>
+                </DialogActions>
+            </Dialog>
         </Paper>
     );
 };
