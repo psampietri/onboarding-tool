@@ -1,29 +1,38 @@
+// backend/services/integration-service/src/services/integrationService.js
 import axios from 'axios';
 import 'dotenv/config';
 
-const JIRA_BASE_URL = process.env.JIRA_BASE_URL;
-const JIRA_API_TOKEN = process.env.JIRA_API_TOKEN;
-const JIRA_USER_EMAIL = process.env.JIRA_USER_EMAIL;
+const getJiraApi = (configKey) => {
+    const BASE_URL = process.env[`${configKey}_BASE_URL`];
+    const API_TOKEN = process.env[`${configKey}_API_TOKEN`];
 
-const jiraApi = axios.create({
-    baseURL: JIRA_BASE_URL,
-    headers: {
-        'Authorization': `Basic ${Buffer.from(`${JIRA_USER_EMAIL}:${JIRA_API_TOKEN}`).toString('base64')}`,
-        'Content-Type': 'application/json',
-    },
-});
+    if (!BASE_URL || !API_TOKEN) {
+        throw new Error(`Missing Jira configuration for configKey: ${configKey}`);
+    }
+
+    return axios.create({
+        baseURL: BASE_URL,
+        headers: {
+            'Authorization': `Basic ${Buffer.from(`:${API_TOKEN}`).toString('base64')}`,
+            'Content-Type': 'application/json',
+        },
+    });
+};
 
 export const getServiceDesks = async (platform, configKey) => {
+    const jiraApi = getJiraApi(configKey);
     const response = await jiraApi.get('/rest/servicedeskapi/servicedesk');
     return response.data;
 };
 
 export const getRequestTypes = async (platform, configKey, serviceDeskId) => {
+    const jiraApi = getJiraApi(configKey);
     const response = await jiraApi.get(`/rest/servicedeskapi/servicedesk/${serviceDeskId}/requesttype`);
     return response.data;
 };
 
 export const getRequestTypeFields = async (platform, configKey, serviceDeskId, requestTypeId) => {
+    const jiraApi = getJiraApi(configKey);
     const response = await jiraApi.get(`/rest/servicedeskapi/servicedesk/${serviceDeskId}/requesttype/${requestTypeId}/field`);
     return response.data;
 };
@@ -63,6 +72,7 @@ export const prepareJiraTicketPayload = (jiraConfig, user) => {
 
 export const createJiraTicket = async (jiraConfig, user) => {
     const payload = prepareJiraTicketPayload(jiraConfig, user);
+    const jiraApi = getJiraApi(jiraConfig.configKey);
     const response = await jiraApi.post('/rest/servicedeskapi/request', payload);
     return response.data;
 };
