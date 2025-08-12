@@ -1,5 +1,22 @@
-# Dependencies
-/node_modules
+# Node.js dependencies
+node_modules/
 
-# Environment Variables
+# Log files
+*.log
+
+# macOS system files
+.DS_Store
+
+# IDE or editor files
+.idea/
+.vscode/
+
+# Yarn
+yarn-error.log
+
+# Build files
+dist/
+build/
+
+# Environment variables
 .env
