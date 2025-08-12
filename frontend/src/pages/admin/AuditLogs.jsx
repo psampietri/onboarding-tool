@@ -151,7 +151,7 @@ const AuditLogs = () => {
                 <Paper sx={{ p: 2, mb: 3 }}>
                     <Typography variant="h6" gutterBottom>Filters</Typography>
                     <Grid container spacing={2}>
-                        <Grid item xs={12} sm={6} md={3}>
+                        <Grid xs={12} sm={6} md={3}>
                             <TextField
                                 fullWidth
                                 label="User ID"
@@ -162,7 +162,7 @@ const AuditLogs = () => {
                                 type="number"
                             />
                         </Grid>
-                        <Grid item xs={12} sm={6} md={3}>
+                        <Grid xs={12} sm={6} md={3}>
                             <FormControl fullWidth size="small">
                                 <InputLabel>Action</InputLabel>
                                 <Select
@@ -179,7 +179,7 @@ const AuditLogs = () => {
                                 </Select>
                             </FormControl>
                         </Grid>
-                        <Grid item xs={12} sm={6} md={3}>
+                        <Grid xs={12} sm={6} md={3}>
                             <FormControl fullWidth size="small">
                                 <InputLabel>Entity Type</InputLabel>
                                 <Select
@@ -197,7 +197,7 @@ const AuditLogs = () => {
                                 </Select>
                             </FormControl>
                         </Grid>
-                        <Grid item xs={12} sm={6} md={3}>
+                        <Grid xs={12} sm={6} md={3}>
                             <TextField
                                 fullWidth
                                 label="Entity ID"
@@ -209,7 +209,7 @@ const AuditLogs = () => {
                             />
                         </Grid>
                         <LocalizationProvider dateAdapter={AdapterDateFns}>
-                            <Grid item xs={12} sm={6} md={3}>
+                            <Grid xs={12} sm={6} md={3}>
                                 <DatePicker
                                     label="From Date"
                                     value={filters.dateFrom}
@@ -217,7 +217,7 @@ const AuditLogs = () => {
                                     renderInput={(params) => <TextField {...params} size="small" fullWidth />}
                                 />
                             </Grid>
-                            <Grid item xs={12} sm={6} md={3}>
+                            <Grid xs={12} sm={6} md={3}>
                                 <DatePicker
                                     label="To Date"
                                     value={filters.dateTo}
@@ -226,7 +226,7 @@ const AuditLogs = () => {
                                 />
                             </Grid>
                         </LocalizationProvider>
-                        <Grid item xs={12} sm={12} md={6}>
+                        <Grid xs={12} sm={12} md={6}>
                             <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
                                 <Button variant="outlined" onClick={handleClearFilters}>
                                     Clear

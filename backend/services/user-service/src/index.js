@@ -15,8 +15,7 @@ app.use(bodyParser.json());
 
 // Define routes for this service
 app.use('/', authRoutes);
-// FIX: Mount user routes at the root
-app.use('/user', userRoutes); 
+app.use('/', userRoutes); 
 
 const startServer = async () => {
     try {

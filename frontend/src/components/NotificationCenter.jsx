@@ -27,7 +27,7 @@ const NotificationCenter = () => {
         
         try {
             const notificationsRes = await api.get(`/notifications/user/${userId}?limit=10`);
-            setNotifications(notificationsRes.data);
+            setNotifications(Array.isArray(notificationsRes.data) ? notificationsRes.data : []);
             
             const unreadRes = await api.get(`/notifications/user/${userId}/unread`);
             setUnreadCount(unreadRes.data.count);

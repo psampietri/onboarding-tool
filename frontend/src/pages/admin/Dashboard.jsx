@@ -256,7 +256,7 @@ const AdminDashboard = () => {
             
             {/* KPI Cards */}
             <Grid container spacing={3} sx={{ mb: 4 }}>
-                <Grid item xs={12} md={3}>
+                <Grid xs={12} md={3}>
                     <StatCard 
                         title="Active Onboardings" 
                         value={stats.activeOnboardings} 
@@ -265,14 +265,14 @@ const AdminDashboard = () => {
                         trendValue="12%"
                     />
                 </Grid>
-                <Grid item xs={12} md={3}>
+                <Grid xs={12} md={3}>
                     <StatCard 
                         title="Total Users" 
                         value={stats.totalUsers} 
                         icon={<PeopleIcon color="secondary" sx={{ fontSize: 40 }} />} 
                     />
                 </Grid>
-                <Grid item xs={12} md={3}>
+                <Grid xs={12} md={3}>
                     <StatCard 
                         title="Avg. Completion Time" 
                         value={stats.avgCompletionDays} 
@@ -281,7 +281,7 @@ const AdminDashboard = () => {
                         trendValue="8%"
                     />
                 </Grid>
-                <Grid item xs={12} md={3}>
+                <Grid xs={12} md={3}>
                     <StatCard 
                         title="Completion Rate" 
                         value={`${stats.completionRate}%`} 
@@ -301,7 +301,7 @@ const AdminDashboard = () => {
                 {/* Overview Tab */}
                 {tabValue === 0 && (
                     <Grid container spacing={3}>
-                        <Grid item xs={12} md={8}>
+                        <Grid xs={12} md={8}>
                             <Typography variant="h6" gutterBottom>Onboarding Completion Trend</Typography>
                             <Paper sx={{ p: 2, height: 300 }}>
                                 <ResponsiveContainer width="100%" height="100%">
@@ -317,7 +317,7 @@ const AdminDashboard = () => {
                                 </ResponsiveContainer>
                             </Paper>
                         </Grid>
-                        <Grid item xs={12} md={4}>
+                        <Grid xs={12} md={4}>
                             <Typography variant="h6" gutterBottom>Status Distribution</Typography>
                             <Paper sx={{ p: 2, height: 300, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                                 <ResponsiveContainer width="100%" height="100%">
@@ -348,7 +348,7 @@ const AdminDashboard = () => {
                 {/* Task Analysis Tab */}
                 {tabValue === 1 && (
                     <Grid container spacing={3}>
-                        <Grid item xs={12} md={6}>
+                        <Grid xs={12} md={6}>
                             <Typography variant="h6" gutterBottom>Task Type Distribution</Typography>
                             <Paper sx={{ p: 2, height: 300 }}>
                                 <ResponsiveContainer width="100%" height="100%">
@@ -373,7 +373,7 @@ const AdminDashboard = () => {
                                 </ResponsiveContainer>
                             </Paper>
                         </Grid>
-                        <Grid item xs={12} md={6}>
+                        <Grid xs={12} md={6}>
                             <Typography variant="h6" gutterBottom>Task Completion Time by Type</Typography>
                             <Paper sx={{ p: 2, height: 300 }}>
                                 <ResponsiveContainer width="100%" height="100%">
@@ -399,7 +399,7 @@ const AdminDashboard = () => {
                 {/* Trends Tab */}
                 {tabValue === 2 && (
                     <Grid container spacing={3}>
-                        <Grid item xs={12}>
+                        <Grid xs={12}>
                             <Typography variant="h6" gutterBottom>Weekly Completion Rate</Typography>
                             <Paper sx={{ p: 2, height: 300 }}>
                                 <ResponsiveContainer width="100%" height="100%">

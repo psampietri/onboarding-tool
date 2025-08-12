@@ -206,7 +206,7 @@ const ManageUsers = () => {
                     <TableBody>
                         {users.map((user) => (
                             <TableRow key={user.id}>
-                                {userFields.map(field => <TableCell key={`${user.id}-${field}`}>{user[field.toLowerCase()]}</TableCell>)}
+                                {userFields.map(field => <TableCell key={`${user.id}-${field}`}>{user[field] || ''}</TableCell>)}
                                 <TableCell align="right">
                                     <IconButton onClick={() => handleOpenEditModal(user)}><EditIcon /></IconButton>
                                     <IconButton onClick={() => handleOpenDialog(user)}><DeleteIcon /></IconButton>
