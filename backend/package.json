@@ -1,0 +1,41 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "api-gateway",
+    "services/analytics-service",
+    "services/integration-service",
+    "services/notification-service",
+    "services/onboarding-service",
+    "services/template-service",
+    "services/user-service",
+    "database"
+  ],
+  "scripts": {
+    "start": "npm run start:api-gateway",
+    "start:api-gateway": "npm start --workspace api-gateway",
+    "start:analytics-service": "npm start --workspace services/analytics-service",
+    "start:integration-service": "npm start --workspace services/integration-service",
+    "start:notification-service": "npm start --workspace services/notification-service",
+    "start:onboarding-service": "npm start --workspace services/onboarding-service",
+    "start:template-service": "npm start --workspace services/template-service",
+    "start:user-service": "npm start --workspace services/user-service",
+    "install:all": "npm install --workspaces"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.0"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "http-proxy-middleware": "^3.0.0",
+    "pg": "^8.11.3",
+    "body-parser": "^1.20.2",
+    "jsonwebtoken": "^9.0.2",
+    "node-fetch": "^3.3.2",
+    "nodemailer": "^6.9.11",
+    "bcrypt": "^5.1.1"
+  }
+}

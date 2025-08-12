@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
 import 'dotenv/config';
-import pool from 'database';
+import pool from '../../database/index.js';
 import authRoutes from './api/authRoutes.js';
 import userRoutes from './api/userRoutes.js';
 
@@ -16,7 +16,7 @@ app.use(bodyParser.json());
 // Define routes for this service
 app.use('/', authRoutes);
 // FIX: Mount user routes at the root
-app.use('/', userRoutes); 
+app.use('/user', userRoutes); 
 
 const startServer = async () => {
     try {

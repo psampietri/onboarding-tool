@@ -3,7 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
 import 'dotenv/config';
-import pool from 'database';
+import pool from '../../database/index.js';
 import analyticsRoutes from './api/analyticsRoutes.js';
 import auditRoutes from './api/auditRoutes.js'; // Import the audit routes
 

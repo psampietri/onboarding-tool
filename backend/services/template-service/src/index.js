@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import 'dotenv/config';
-import pool from 'database';
+import pool from '../../database/index.js';
 
 // Dynamically import routes based on service name
 const serviceName = process.cwd().split('/').pop();

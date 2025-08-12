@@ -68,8 +68,6 @@ CREATE TABLE task_template_dependencies (
     PRIMARY KEY (task_template_id, depends_on_id)
 );
 
--- NOT IN THE DATABASE YET
-
 -- Notifications Table
 CREATE TABLE notifications (
     id SERIAL PRIMARY KEY,
