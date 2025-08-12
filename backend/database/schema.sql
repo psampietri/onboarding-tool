@@ -60,3 +60,49 @@ CREATE TABLE task_instances (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Task Dependencies Table
+CREATE TABLE task_template_dependencies (
+    task_template_id INTEGER NOT NULL REFERENCES task_templates(id) ON DELETE CASCADE,
+    depends_on_id INTEGER NOT NULL REFERENCES task_templates(id) ON DELETE CASCADE,
+    PRIMARY KEY (task_template_id, depends_on_id)
+);
+
+-- NOT IN THE DATABASE YET
+
+-- Notifications Table
+CREATE TABLE notifications (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    type VARCHAR(50) NOT NULL CHECK (type IN ('info', 'warning', 'success', 'error')),
+    is_read BOOLEAN DEFAULT FALSE,
+    related_entity_type VARCHAR(50),
+    related_entity_id INTEGER,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Email Templates Table
+CREATE TABLE email_templates (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    subject VARCHAR(255) NOT NULL,
+    body_template TEXT NOT NULL,
+    created_by INTEGER REFERENCES users(id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Audit Logs Table
+CREATE TABLE audit_logs (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id),
+    action VARCHAR(255) NOT NULL,
+    entity_type VARCHAR(50) NOT NULL,
+    entity_id INTEGER,
+    details JSONB,
+    ip_address VARCHAR(50),
+    user_agent TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);

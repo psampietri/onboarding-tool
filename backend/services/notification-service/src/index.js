@@ -1,14 +1,12 @@
-// backend/services/analytics-service/src/index.js
 import express from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
 import 'dotenv/config';
 import pool from 'database';
-import analyticsRoutes from './api/analyticsRoutes.js';
-import auditRoutes from './api/auditRoutes.js'; // Import the audit routes
+import notificationRoutes from './api/notificationRoutes.js';
 
 const app = express();
-const PORT = process.env.PORT || 5004;
+const PORT = process.env.PORT || 5006;
 
 app.use(cors());
 app.use(bodyParser.json());
@@ -24,14 +22,13 @@ pool.query('SELECT NOW()', (err) => {
 });
 
 // Routes
-app.use('/analytics', analyticsRoutes);
-app.use('/audit', auditRoutes); // Add the audit routes
+app.use('/notifications', notificationRoutes);
 
 // Health check endpoint
 app.get('/', (req, res) => {
-    res.json({ status: 'Analytics Service is running' });
+    res.json({ status: 'Notification Service is running' });
 });
 
 app.listen(PORT, () => {
-    console.log(`Analytics service is running on port ${PORT}`);
+    console.log(`Notification service is running on port ${PORT}`);
 });

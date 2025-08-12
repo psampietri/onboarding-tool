@@ -15,7 +15,8 @@ const services = {
     template: 'http://localhost:5002',
     onboarding: 'http://localhost:5003',
     analytics: 'http://localhost:5004',
-    integration: 'http://localhost:5005', // Add the new service
+    integration: 'http://localhost:5005',
+    notification: 'http://localhost:5006',
 };
 
 const commonProxyOptions = {
@@ -48,6 +49,17 @@ app.use('/api/analytics', authenticateToken, createProxyMiddleware({ ...commonPr
 // Add the new proxy route for the integration service
 app.use('/api/integrations', authenticateToken, createProxyMiddleware({ ...commonProxyOptions, target: services.integration, pathRewrite: { '^/api/integrations': '' } }));
 
+app.use('/api/notifications', authenticateToken, createProxyMiddleware({ 
+    ...commonProxyOptions, 
+    target: services.notification, 
+    pathRewrite: { '^/api/notifications': '/notifications' } 
+}));
+
+app.use('/api/audit', authenticateToken, createProxyMiddleware({ 
+    ...commonProxyOptions, 
+    target: services.analytics, 
+    pathRewrite: { '^/api/audit': '/audit' } 
+}));
 
 app.listen(PORT, () => {
     console.log(`API Gateway listening on port ${PORT}`);
