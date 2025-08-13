@@ -20,6 +20,8 @@ const style = {
     border: '2px solid #000',
     boxShadow: 24,
     p: 4,
+    maxHeight: '90vh',
+    overflowY: 'auto',
 };
 
 const ManageFieldsModal = ({ open, onClose, userFields, onFieldUpdate }) => {
@@ -94,6 +96,7 @@ const ManageUsers = () => {
 
     const [dialogOpen, setDialogOpen] = useState(false);
     const [userToDelete, setUserToDelete] = useState(null);
+    const [newOwnerId, setNewOwnerId] = useState('');
     
     const [fieldsModalOpen, setFieldsModalOpen] = useState(false);
 
@@ -121,7 +124,7 @@ const ManageUsers = () => {
 
     const handleOpenCreateModal = () => {
         setIsEditing(false);
-        setCurrentUser({});
+        setCurrentUser({ role: 'user' });
         setModalOpen(true);
     };
 
@@ -140,6 +143,7 @@ const ManageUsers = () => {
 
     const handleCloseDialog = () => {
         setUserToDelete(null);
+        setNewOwnerId('');
         setDialogOpen(false);
     };
 
@@ -167,8 +171,12 @@ const ManageUsers = () => {
 
     const handleDeleteUser = async () => {
         setError('');
+        if (!newOwnerId) {
+            setError('You must select a new owner for the assets.');
+            return;
+        }
         try {
-            await api.delete(`/users/${userToDelete.id}`);
+            await api.delete(`/users/${userToDelete.id}`, { data: { newOwnerId } });
             handleCloseDialog();
             fetchData(); // Refresh the list
         } catch (err) {
@@ -280,12 +288,26 @@ const ManageUsers = () => {
                 <DialogTitle>Delete User</DialogTitle>
                 <DialogContent>
                     <DialogContentText>
-                        Are you sure you want to delete the user "{userToDelete?.name}"? This action cannot be undone.
+                        To delete "{userToDelete?.name}", you must reassign their created templates and other assets to another user.
                     </DialogContentText>
+                    <FormControl fullWidth margin="normal">
+                        <InputLabel>Reassign Assets To</InputLabel>
+                        <Select
+                            value={newOwnerId}
+                            label="Reassign Assets To"
+                            onChange={(e) => setNewOwnerId(e.target.value)}
+                        >
+                            {users.filter(u => u.id !== userToDelete?.id).map(user => (
+                                <MenuItem key={user.id} value={user.id}>{user.name}</MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={handleCloseDialog}>Cancel</Button>
-                    <Button onClick={handleDeleteUser} color="error">Delete</Button>
+                    <Button onClick={handleDeleteUser} color="error" disabled={!newOwnerId}>
+                        Delete User
+                    </Button>
                 </DialogActions>
             </Dialog>
         </Container>

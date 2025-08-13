@@ -146,5 +146,18 @@ export const updateOnboardingInstance = async (id, { status }) => {
 };
 
 export const deleteOnboardingInstance = async (id) => {
-    await pool.query('DELETE FROM onboarding_instances WHERE id = $1', [id]);
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        // First, delete the associated task instances
+        await client.query('DELETE FROM task_instances WHERE onboarding_instance_id = $1', [id]);
+        // Then, delete the onboarding instance itself
+        await client.query('DELETE FROM onboarding_instances WHERE id = $1', [id]);
+        await client.query('COMMIT');
+    } catch (e) {
+        await client.query('ROLLBACK');
+        throw e;
+    } finally {
+        client.release();
+    }
 };

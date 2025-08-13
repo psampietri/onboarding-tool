@@ -50,3 +50,11 @@ export const dryRunAutomatedTask = async (taskId) => {
         payload: payload
     };
 };
+
+export const updateOnboardingInstance = async (instanceId, data) => {
+    return await OnboardingModel.updateOnboardingInstance(instanceId, data);
+};
+
+export const deleteOnboardingInstance = async (instanceId) => {
+    return await OnboardingModel.deleteOnboardingInstance(instanceId);
+};

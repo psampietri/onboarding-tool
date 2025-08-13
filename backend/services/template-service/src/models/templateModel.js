@@ -85,6 +85,52 @@ export const deleteOnboardingTemplate = async (id) => {
     await pool.query('DELETE FROM onboarding_templates WHERE id = $1', [id]);
 };
 
+export const duplicateOnboardingTemplate = async (templateId, createdBy) => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // 1. Get the original template
+        const originalTemplateRes = await client.query('SELECT * FROM onboarding_templates WHERE id = $1', [templateId]);
+        if (originalTemplateRes.rows.length === 0) {
+            throw new Error('Template not found');
+        }
+        const originalTemplate = originalTemplateRes.rows[0];
+
+        // 2. Create the new template
+        const newName = `Copy of ${originalTemplate.name}`;
+        const newTemplateRes = await client.query(
+            'INSERT INTO onboarding_templates (name, description, created_by) VALUES ($1, $2, $3) RETURNING *',
+            [newName, originalTemplate.description, createdBy]
+        );
+        const newTemplate = newTemplateRes.rows[0];
+
+        // 3. Get the tasks from the original template
+        const tasksRes = await client.query(
+            'SELECT task_template_id, "order" FROM onboarding_template_tasks WHERE onboarding_template_id = $1',
+            [templateId]
+        );
+
+        // 4. Associate the tasks with the new template
+        if (tasksRes.rows.length > 0) {
+            for (const task of tasksRes.rows) {
+                await client.query(
+                    'INSERT INTO onboarding_template_tasks (onboarding_template_id, task_template_id, "order") VALUES ($1, $2, $3)',
+                    [newTemplate.id, task.task_template_id, task.order]
+                );
+            }
+        }
+
+        await client.query('COMMIT');
+        return newTemplate;
+    } catch (e) {
+        await client.query('ROLLBACK');
+        throw e;
+    } finally {
+        client.release();
+    }
+};
+
 // --- Task Templates ---
 
 export const createTaskTemplate = async ({ name, description, instructions, task_type, config, created_by, dependencies }) => {
@@ -170,4 +216,50 @@ export const updateTaskTemplate = async (id, { name, description, instructions, 
 export const deleteTaskTemplate = async (id) => {
     const result = await pool.query('DELETE FROM task_templates WHERE id = $1', [id]);
     return result.rowCount; // Returns the number of rows deleted
+};
+
+export const duplicateTaskTemplate = async (templateId, createdBy) => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // 1. Get the original template
+        const originalTemplateRes = await client.query('SELECT * FROM task_templates WHERE id = $1', [templateId]);
+        if (originalTemplateRes.rows.length === 0) {
+            throw new Error('Template not found');
+        }
+        const originalTemplate = originalTemplateRes.rows[0];
+
+        // 2. Create the new template
+        const newName = `Copy of ${originalTemplate.name}`;
+        const newTemplateRes = await client.query(
+            'INSERT INTO task_templates (name, description, instructions, task_type, config, created_by) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+            [newName, originalTemplate.description, originalTemplate.instructions, originalTemplate.task_type, originalTemplate.config, createdBy]
+        );
+        const newTemplate = newTemplateRes.rows[0];
+
+        // 3. Get dependencies from the original template
+        const depsRes = await client.query(
+            'SELECT depends_on_id FROM task_template_dependencies WHERE task_template_id = $1',
+            [templateId]
+        );
+
+        // 4. Add dependencies to the new template
+        if (depsRes.rows.length > 0) {
+            for (const dep of depsRes.rows) {
+                await client.query(
+                    'INSERT INTO task_template_dependencies (task_template_id, depends_on_id) VALUES ($1, $2)',
+                    [newTemplate.id, dep.depends_on_id]
+                );
+            }
+        }
+
+        await client.query('COMMIT');
+        return newTemplate;
+    } catch (e) {
+        await client.query('ROLLBACK');
+        throw e;
+    } finally {
+        client.release();
+    }
 };

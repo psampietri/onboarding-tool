@@ -13,6 +13,16 @@ router.post('/onboarding', async (req, res) => {
     }
 });
 
+router.post('/onboarding/:id/duplicate', async (req, res) => {
+    try {
+        const { created_by } = req.body;
+        const duplicatedTemplate = await TemplateService.duplicateOnboardingTemplate(req.params.id, created_by);
+        res.status(201).json(duplicatedTemplate);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
 router.get('/onboarding', async (req, res) => {
     const templates = await TemplateService.getAllOnboardingTemplates();
     res.json(templates);
@@ -48,6 +58,16 @@ router.post('/tasks', async (req, res) => {
     try {
         const newTemplate = await TemplateService.createTaskTemplate(req.body);
         res.status(201).json(newTemplate);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+router.post('/tasks/:id/duplicate', async (req, res) => {
+    try {
+        const { created_by } = req.body;
+        const duplicatedTemplate = await TemplateService.duplicateTaskTemplate(req.params.id, created_by);
+        res.status(201).json(duplicatedTemplate);
     } catch (error) {
         res.status(400).json({ error: error.message });
     }

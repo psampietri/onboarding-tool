@@ -1,4 +1,3 @@
-// frontend/src/pages/admin/OnboardingInstanceDetail.jsx
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
@@ -6,7 +5,7 @@ import {
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Chip,
     FormControl, Select, MenuItem, Button, Tooltip, Grid, Card, CardContent,
     LinearProgress, Stack, Divider, List, ListItem, ListItemText, ListItemIcon,
-    Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, InputLabel, Modal
+    Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, InputLabel, Modal, Link, TextField
 } from '@mui/material';
 import LockIcon from '@mui/icons-material/Lock';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -15,11 +14,14 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import IconButton from '@mui/material/IconButton';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import ConfirmationNumberIcon from '@mui/icons-material/ConfirmationNumber';
 import { TreeView, TreeItem } from '@mui/lab';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import api from '../../services/api';
-import { executeAutomatedTask, dryRunAutomatedTask, updateOnboardingInstance, deleteOnboardingInstance } from '../../services/onboardingService';
+import { executeAutomatedTask, dryRunAutomatedTask, updateOnboardingInstance, deleteOnboardingInstance, updateTaskStatus } from '../../services/onboardingService';
+import { getTicketDetails } from '../../services/integrationService';
+
 
 const style = {
     position: 'absolute',
@@ -45,6 +47,12 @@ const OnboardingInstanceDetail = () => {
     const [dryRunModalOpen, setDryRunModalOpen] = useState(false);
     const [dryRunResult, setDryRunResult] = useState(null);
     const [taskTree, setTaskTree] = useState([]);
+    const [ticketModalOpen, setTicketModalOpen] = useState(false);
+    const [selectedTaskForTicket, setSelectedTaskForTicket] = useState(null);
+    const [liveTicketDetails, setLiveTicketDetails] = useState(null);
+    const [ticketDetailsLoading, setTicketDetailsLoading] = useState(false);
+    const [manualTicketInfo, setManualTicketInfo] = useState({ key: '', self: '' });
+    const [isManualTicketEntry, setIsManualTicketEntry] = useState(false);
 
     const fetchInstanceDetails = async () => {
         try {
@@ -165,23 +173,79 @@ const OnboardingInstanceDetail = () => {
     };
 
     const blockedTasks = useMemo(() => {
-        if (!instance?.tasks) return new Set();
+        if (!instance?.tasks) return new Map();
         
+        const tasksMap = new Map(instance.tasks.map(t => [t.task_template_id, t]));
         const completedTaskIds = new Set(
             instance.tasks.filter(t => t.status === 'completed').map(t => t.task_template_id)
         );
         
-        const blocked = new Set();
+        const blocked = new Map();
         instance.tasks.forEach(task => {
             if (task.dependencies && task.dependencies.length > 0) {
-                const isBlocked = !task.dependencies.every(depId => completedTaskIds.has(depId));
-                if (isBlocked) {
-                    blocked.add(task.id);
+                const blockers = task.dependencies
+                    .filter(depId => !completedTaskIds.has(depId))
+                    .map(depId => tasksMap.get(depId)?.name || `Task ID ${depId}`);
+
+                if (blockers.length > 0) {
+                    blocked.set(task.id, blockers);
                 }
             }
         });
         return blocked;
     }, [instance]);
+
+    const handleOpenTicketModal = async (task) => {
+        setSelectedTaskForTicket(task);
+        setLiveTicketDetails(null);
+        setTicketDetailsLoading(false);
+        setManualTicketInfo(task.ticket_info || { key: '', self: '' });
+        
+        const isAutomated = task.task_type === 'automated_access_request';
+        const hasTicket = task.ticket_info && task.ticket_info.key;
+
+        // Default to manual entry if not automated, or if automated but no ticket exists yet
+        setIsManualTicketEntry(!isAutomated || (isAutomated && !hasTicket));
+
+        if (isAutomated && hasTicket) {
+            setTicketDetailsLoading(true);
+            try {
+                const details = await getTicketDetails('jira', task.ticket_info.key);
+                setLiveTicketDetails(details);
+            } catch (err) {
+                console.error("Failed to fetch live ticket details", err);
+                setError("Failed to fetch live ticket details from Jira.");
+            } finally {
+                setTicketDetailsLoading(false);
+            }
+        }
+        setTicketModalOpen(true);
+    };
+
+    const handleSaveTicketInfo = async () => {
+        try {
+            const ticketInfoToSave = {
+                ...manualTicketInfo,
+                self: manualTicketInfo.key ? `${process.env.JIRA_BASE_URL}/browse/${manualTicketInfo.key}` : manualTicketInfo.self
+            };
+            await updateTaskStatus(selectedTaskForTicket.id, selectedTaskForTicket.status, ticketInfoToSave);
+            fetchInstanceDetails();
+            setTicketModalOpen(false);
+        } catch (err) {
+            setError("Failed to save ticket information.");
+        }
+    };
+
+    const handleRemoveTicketInfo = async () => {
+        try {
+            await updateTaskStatus(selectedTaskForTicket.id, selectedTaskForTicket.status, null);
+            fetchInstanceDetails();
+            setTicketModalOpen(false);
+        } catch (err) {
+            setError("Failed to remove ticket information.");
+        }
+    };
+
 
     const progress = useMemo(() => {
         if (!instance?.tasks || instance.tasks.length === 0) return 0;
@@ -260,7 +324,7 @@ const OnboardingInstanceDetail = () => {
                 
                 <Grid container spacing={3}>
                     {/* Summary Card */}
-                    <Grid xs={12} md={6}>
+                    <Grid item xs={12} md={6}>
                         <Paper sx={{ p: 3 }}>
                             <Typography variant="h6" gutterBottom>Onboarding Summary</Typography>
                             <Typography><strong>User:</strong> {instance.user_name}</Typography>
@@ -297,11 +361,11 @@ const OnboardingInstanceDetail = () => {
                     </Grid>
                     
                     {/* Stats Card */}
-                    <Grid xs={12} md={6}>
+                    <Grid item xs={12} md={6}>
                         <Paper sx={{ p: 3 }}>
                             <Typography variant="h6" gutterBottom>Task Statistics</Typography>
                             <Grid container spacing={2}>
-                                <Grid xs={6}>
+                                <Grid item xs={6}>
                                     <Card variant="outlined" sx={{ bgcolor: 'success.light', color: 'success.contrastText' }}>
                                         <CardContent>
                                             <Typography variant="h5">{tasksByStatus.completed?.length || 0}</Typography>
@@ -309,7 +373,7 @@ const OnboardingInstanceDetail = () => {
                                         </CardContent>
                                     </Card>
                                 </Grid>
-                                <Grid xs={6}>
+                                <Grid item xs={6}>
                                     <Card variant="outlined" sx={{ bgcolor: 'warning.light', color: 'warning.contrastText' }}>
                                         <CardContent>
                                             <Typography variant="h5">{tasksByStatus.in_progress?.length || 0}</Typography>
@@ -317,15 +381,15 @@ const OnboardingInstanceDetail = () => {
                                         </CardContent>
                                     </Card>
                                 </Grid>
-                                <Grid xs={6}>
+                                <Grid item xs={6}>
                                     <Card variant="outlined" sx={{ bgcolor: 'error.light', color: 'error.contrastText' }}>
                                         <CardContent>
-                                            <Typography variant="h5">{tasksByStatus.blocked?.length || 0}</Typography>
+                                            <Typography variant="h5">{blockedTasks.size || 0}</Typography>
                                             <Typography variant="body2">Blocked</Typography>
                                         </CardContent>
                                     </Card>
                                 </Grid>
-                                <Grid xs={6}>
+                                <Grid item xs={6}>
                                     <Card variant="outlined">
                                         <CardContent>
                                             <Typography variant="h5">{tasksByStatus.not_started?.length || 0}</Typography>
@@ -353,6 +417,7 @@ const OnboardingInstanceDetail = () => {
                         variant={activeTab === 'timeline' ? 'contained' : 'text'} 
                         onClick={() => setActiveTab('timeline')}
                         sx={{ mx: 1 }}
+                        disabled // Timeline view is currently disabled
                     >
                         Timeline View
                     </Button>
@@ -388,6 +453,7 @@ const OnboardingInstanceDetail = () => {
                         <TableBody>
                             {instance.tasks.map((task) => {
                                 const isBlocked = blockedTasks.has(task.id);
+                                const blockers = blockedTasks.get(task.id);
                                 return (
                                     <TableRow key={task.id} sx={{ opacity: isBlocked ? 0.6 : 1 }}>
                                         <TableCell>
@@ -401,9 +467,9 @@ const OnboardingInstanceDetail = () => {
                                                     </Tooltip>
                                                 )}
                                             </Box>
-                                            {task.ticket_info && (
+                                            {task.ticket_info?.key && (
                                                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                                                    Ticket: <a href={task.ticket_info.self} target="_blank" rel="noopener noreferrer">{task.ticket_info.key}</a>
+                                                    Ticket: <Link href={task.ticket_info.self} target="_blank" rel="noopener noreferrer">{task.ticket_info.key}</Link>
                                                 </Typography>
                                             )}
                                         </TableCell>
@@ -426,10 +492,13 @@ const OnboardingInstanceDetail = () => {
                                         </TableCell>
                                         <TableCell>
                                             {isBlocked && (
-                                                <Tooltip title="This task is blocked by one or more incomplete dependencies.">
+                                                <Tooltip title={`Blocked by: ${blockers.join(', ')}`}>
                                                     <IconButton><LockIcon /></IconButton>
                                                 </Tooltip>
                                             )}
+                                            <Tooltip title="View Ticket">
+                                                <IconButton onClick={() => handleOpenTicketModal(task)}><ConfirmationNumberIcon /></IconButton>
+                                            </Tooltip>
                                             {task.task_type === 'automated_access_request' && task.status === 'not_started' && !isBlocked && (
                                                 <>
                                                     <Button
@@ -460,171 +529,37 @@ const OnboardingInstanceDetail = () => {
                 </TableContainer>
             )}
             
-            {/* Timeline View */}
-            {activeTab === 'timeline' && (
-                <Paper sx={{ p: 2 }}>
-                    <Timeline position="alternate">
-                        {instance.tasks.map((task) => {
-                            const isBlocked = blockedTasks.has(task.id);
-                            let dotColor;
-                            switch(task.status) {
-                                case 'completed': dotColor = 'success'; break;
-                                case 'in_progress': dotColor = 'warning'; break;
-                                case 'blocked': dotColor = 'error'; break;
-                                default: dotColor = 'grey';
-                            }
-                            
-                            return (
-                                <TimelineItem key={task.id}>
-                                    <TimelineSeparator>
-                                        <TimelineDot color={dotColor}>
-                                            {getStatusIcon(task.status)}
-                                        </TimelineDot>
-                                        <TimelineConnector />
-                                    </TimelineSeparator>
-                                    <TimelineContent>
-                                        <Paper elevation={3} sx={{ p: 2, opacity: isBlocked ? 0.6 : 1 }}>
-                                            <Typography variant="h6" component="div">
-                                                {task.name}
-                                            </Typography>
-                                            <Typography color="textSecondary" variant="body2">
-                                                {task.task_type}
-                                            </Typography>
-                                            <Box sx={{ mt: 1 }}>
-                                                <Chip 
-                                                    label={task.status} 
-                                                    color={getStatusChipColor(task.status)} 
-                                                    size="small"
-                                                    sx={{ mr: 1 }}
-                                                />
-                                                {task.task_type === 'automated_access_request' && task.status === 'not_started' && !isBlocked && (
-                                                    <Button
-                                                        variant="contained"
-                                                        size="small"
-                                                        onClick={() => handleExecuteTask(task.id)}
-                                                        disabled={taskLoading === task.id}
-                                                    >
-                                                        {taskLoading === task.id ? <CircularProgress size={20} /> : 'Run Automation'}
-                                                    </Button>
-                                                )}
-                                            </Box>
-                                        </Paper>
-                                    </TimelineContent>
-                                </TimelineItem>
-                            );
-                        })}
-                    </Timeline>
-                </Paper>
-            )}
-            
             {/* Kanban View */}
             {activeTab === 'kanban' && (
                 <Grid container spacing={2}>
-                    <Grid xs={12} sm={6} md={3}>
-                        <Paper sx={{ p: 2, bgcolor: '#f5f5f5', height: '100%' }}>
-                            <Typography variant="h6" gutterBottom>Not Started</Typography>
-                            <Divider sx={{ mb: 2 }} />
-                            <List>
-                                {(tasksByStatus.not_started || []).map(task => {
-                                    const isBlocked = blockedTasks.has(task.id);
-                                    return (
-                                        <ListItem
-                                            key={task.id}
-                                            component={Paper}
-                                            sx={{ mb: 1, opacity: isBlocked ? 0.6 : 1 }}
-                                        >
-                                            <ListItemIcon>
-                                                {isBlocked ? <LockIcon color="error" /> : getStatusIcon(task.status)}
-                                            </ListItemIcon>
-                                            <ListItemText
-                                                primary={task.name}
-                                                secondary={task.task_type}
-                                            />
-                                            {task.task_type === 'automated_access_request' && !isBlocked && (
-                                                <Button
-                                                    variant="contained"
-                                                    size="small"
-                                                    onClick={() => handleExecuteTask(task.id)}
-                                                    disabled={taskLoading === task.id}
-                                                >
-                                                    {taskLoading === task.id ? <CircularProgress size={20} /> : 'Run'}
-                                                </Button>
-                                            )}
-                                        </ListItem>
-                                    );
-                                })}
-                            </List>
-                        </Paper>
-                    </Grid>
-                    <Grid xs={12} sm={6} md={3}>
-                        <Paper sx={{ p: 2, bgcolor: '#fff9c4', height: '100%' }}>
-                            <Typography variant="h6" gutterBottom>In Progress</Typography>
-                            <Divider sx={{ mb: 2 }} />
-                            <List>
-                                {(tasksByStatus.in_progress || []).map(task => (
-                                    <ListItem
-                                        key={task.id}
-                                        component={Paper}
-                                        sx={{ mb: 1 }}
-                                    >
-                                        <ListItemIcon>
-                                            {getStatusIcon(task.status)}
-                                        </ListItemIcon>
-                                        <ListItemText
-                                            primary={task.name}
-                                            secondary={task.task_type}
-                                        />
-                                    </ListItem>
-                                ))}
-                            </List>
-                        </Paper>
-                    </Grid>
-                    <Grid xs={12} sm={6} md={3}>
-                        <Paper sx={{ p: 2, bgcolor: '#e8f5e9', height: '100%' }}>
-                            <Typography variant="h6" gutterBottom>Completed</Typography>
-                            <Divider sx={{ mb: 2 }} />
-                            <List>
-                                {(tasksByStatus.completed || []).map(task => (
-                                    <ListItem
-                                        key={task.id}
-                                        component={Paper}
-                                        sx={{ mb: 1 }}
-                                    >
-                                        <ListItemIcon>
-                                            {getStatusIcon(task.status)}
-                                        </ListItemIcon>
-                                        <ListItemText
-                                            primary={task.name}
-                                            secondary={task.task_type}
-                                        />
-                                    </ListItem>
-                                ))}
-                            </List>
-                        </Paper>
-                    </Grid>
-                    <Grid xs={12} sm={6} md={3}>
-                        <Paper sx={{ p: 2, bgcolor: '#ffebee', height: '100%' }}>
-                            <Typography variant="h6" gutterBottom>Blocked</Typography>
-                            <Divider sx={{ mb: 2 }} />
-                            <List>
-                                {(tasksByStatus.blocked || []).map(task => (
-                                    <ListItem
-                                        key={task.id}
-                                        component={Paper}
-                                        sx={{ mb: 1 }}
-                                    >
-                                        <ListItemIcon>
-                                            {getStatusIcon(task.status)}
-                                        </ListItemIcon>
-                                        <ListItemText
-                                            primary={task.name}
-                                            secondary={task.task_type}
-                                        />
-                                    </ListItem>
-                                ))}
-                            </List>
-                        </Paper>
-                    </Grid>
+                    {['not_started', 'in_progress', 'completed', 'blocked'].map(status => (
+                        <Grid item xs={12} sm={6} md={3} key={status}>
+                            <Paper sx={{ p: 2, bgcolor: `${getStatusChipColor(status)}.lightest`, height: '100%' }}>
+                                <Typography variant="h6" gutterBottom sx={{ textTransform: 'capitalize' }}>{status.replace('_', ' ')}</Typography>
+                                <Divider sx={{ mb: 2 }} />
+                                <List>
+                                    {(tasksByStatus[status] || []).map(task => {
+                                        const isBlocked = blockedTasks.has(task.id);
+                                        return (
+                                            <ListItem
+                                                key={task.id}
+                                                component={Paper}
+                                                sx={{ mb: 1, opacity: isBlocked && status !== 'blocked' ? 0.6 : 1 }}
+                                            >
+                                                <ListItemIcon>
+                                                    {isBlocked && status !== 'blocked' ? <LockIcon color="error" /> : getStatusIcon(task.status)}
+                                                </ListItemIcon>
+                                                <ListItemText
+                                                    primary={task.name}
+                                                    secondary={task.task_type}
+                                                />
+                                            </ListItem>
+                                        );
+                                    })}
+                                </List>
+                            </Paper>
+                        </Grid>
+                    ))}
                 </Grid>
             )}
 
@@ -664,6 +599,42 @@ const OnboardingInstanceDetail = () => {
                                 <pre>{JSON.stringify(dryRunResult.payload, null, 2)}</pre>
                             </Paper>
                         </>
+                    )}
+                </Box>
+            </Modal>
+            
+            <Modal open={ticketModalOpen} onClose={() => setTicketModalOpen(false)}>
+                <Box sx={style}>
+                    <Typography variant="h6" component="h2">Ticket Information</Typography>
+                    {isManualTicketEntry ? (
+                        <Box component="form" onSubmit={(e) => { e.preventDefault(); handleSaveTicketInfo(); }}>
+                            <TextField
+                                fullWidth
+                                label="Ticket Key"
+                                margin="normal"
+                                value={manualTicketInfo.key}
+                                onChange={(e) => setManualTicketInfo(prev => ({ ...prev, key: e.target.value }))}
+                            />
+                            <DialogActions>
+                                <Button onClick={() => setTicketModalOpen(false)}>Cancel</Button>
+                                <Button onClick={handleRemoveTicketInfo} color="error">Remove</Button>
+                                <Button type="submit" variant="contained">Save</Button>
+                            </DialogActions>
+                        </Box>
+                    ) : (
+                        <Box>
+                            {ticketDetailsLoading ? <CircularProgress /> : (
+                                liveTicketDetails ? (
+                                    <List>
+                                        <ListItem><ListItemText primary="Ticket Key" secondary={liveTicketDetails.key} /></ListItem>
+                                        <ListItem><ListItemText primary="Status" secondary={liveTicketDetails.fields.status.name} /></ListItem>
+                                        <ListItem><ListItemText primary="Created" secondary={new Date(liveTicketDetails.fields.created).toLocaleString()} /></ListItem>
+                                        <ListItem><ListItemText primary="Resolved" secondary={liveTicketDetails.fields.resolutiondate ? new Date(liveTicketDetails.fields.resolutiondate).toLocaleString() : 'Not resolved'} /></ListItem>
+                                    </List>
+                                ) : <Typography>No ticket information found.</Typography>
+                            )}
+                            <Button onClick={() => setIsManualTicketEntry(true)} sx={{ mt: 2 }}>Switch to Manual Entry</Button>
+                        </Box>
                     )}
                 </Box>
             </Modal>

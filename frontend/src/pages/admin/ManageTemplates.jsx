@@ -3,11 +3,12 @@ import {
     Container, Typography, Paper, TableContainer, Table, TableHead,
     TableRow, TableCell, TableBody, CircularProgress, Box, Alert, Button,
     Modal, TextField, FormControl, InputLabel, Select, MenuItem, IconButton,
-    Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, List, ListItem, ListItemText, Checkbox, Grid, Chip
+    Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, List, ListItem, ListItemText, Checkbox, Grid, Chip, Tooltip
 } from '@mui/material';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import api from '../../services/api';
 import { getServiceDesks, getRequestTypes, getRequestTypeFields } from '../../services/integrationService';
 import { getUserFields } from '../../services/userService';
@@ -124,6 +125,23 @@ const OnboardingTemplates = ({ taskTemplates, fetchTaskTemplates }) => {
         }
     };
 
+    const handleDuplicateTemplate = async (templateId) => {
+        setError('');
+        try {
+            const currentUser = JSON.parse(localStorage.getItem('user'));
+            const response = await api.post(`/templates/onboarding/${templateId}/duplicate`, { created_by: currentUser.id });
+            
+            // Update the local state to include the new template
+            setOnboardingTemplates(prev => [...prev, response.data]);
+            
+            // Now, open the modal for the new template
+            handleOpenEditModal(response.data);
+        } catch (err) {
+            setError('Failed to duplicate onboarding template.');
+            console.error(err);
+        }
+    };
+
     if (loading) return <CircularProgress />;
 
     return (
@@ -150,8 +168,15 @@ const OnboardingTemplates = ({ taskTemplates, fetchTaskTemplates }) => {
                                 <TableCell>{template.name}</TableCell>
                                 <TableCell>{template.description}</TableCell>
                                 <TableCell align="right">
-                                    <IconButton size="small" onClick={() => handleOpenEditModal(template)}><EditIcon fontSize="small" /></IconButton>
-                                    <IconButton size="small" onClick={() => handleOpenDeleteDialog(template)}><DeleteIcon fontSize="small" /></IconButton>
+                                    <Tooltip title="Duplicate">
+                                        <IconButton size="small" onClick={() => handleDuplicateTemplate(template.id)}><ContentCopyIcon fontSize="small" /></IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="Edit">
+                                        <IconButton size="small" onClick={() => handleOpenEditModal(template)}><EditIcon fontSize="small" /></IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="Delete">
+                                        <IconButton size="small" onClick={() => handleOpenDeleteDialog(template)}><DeleteIcon fontSize="small" /></IconButton>
+                                    </Tooltip>
                                 </TableCell>
                             </TableRow>
                         ))}
@@ -197,7 +222,7 @@ const OnboardingTemplates = ({ taskTemplates, fetchTaskTemplates }) => {
     );
 };
 
-const TaskTemplates = ({ taskTemplates, fetchTaskTemplates }) => {
+const TaskTemplates = ({ taskTemplates, setTaskTemplates, fetchTaskTemplates }) => {
     const [error, setError] = useState('');
     const [modalOpen, setModalOpen] = useState(false);
     const [dialogOpen, setDialogOpen] = useState(false);
@@ -281,7 +306,20 @@ const TaskTemplates = ({ taskTemplates, fetchTaskTemplates }) => {
 
     const handleOpenEditModal = (template) => {
         setIsEditing(true);
-        setCurrentTemplate({ ...template, config: JSON.stringify(template.config || {}, null, 2) });
+        const templateData = { ...template, config: JSON.stringify(template.config || {}, null, 2) };
+        setCurrentTemplate(templateData);
+
+        if (template.task_type === 'automated_access_request' && template.config && template.config.jira) {
+            const { serviceDeskId, requestTypeId, fieldMappings } = template.config.jira;
+            setSelectedServiceDesk(serviceDeskId || '');
+            setSelectedRequestType(requestTypeId || '');
+            setFieldMappings(fieldMappings || {});
+        } else {
+            setSelectedServiceDesk('');
+            setSelectedRequestType('');
+            setFieldMappings({});
+        }
+
         setModalOpen(true);
     };
 
@@ -354,6 +392,23 @@ const TaskTemplates = ({ taskTemplates, fetchTaskTemplates }) => {
         }
     };
 
+    const handleDuplicateTemplate = async (templateId) => {
+        setError('');
+        try {
+            const currentUser = JSON.parse(localStorage.getItem('user'));
+            const response = await api.post(`/templates/tasks/${templateId}/duplicate`, { created_by: currentUser.id });
+            
+            // Update local state to include the new template
+            setTaskTemplates(prev => [...prev, response.data]);
+            
+            // Now, open the modal for the new template
+            handleOpenEditModal(response.data);
+        } catch (err) {
+            setError('Failed to duplicate task template.');
+            console.error(err);
+        }
+    };
+
     const renderStaticInput = (field) => {
         const mapping = fieldMappings[field.fieldId] || {};
         const hasValidValues = field.validValues && field.validValues.length > 0;
@@ -418,8 +473,15 @@ const TaskTemplates = ({ taskTemplates, fetchTaskTemplates }) => {
                                     })}
                                 </TableCell>
                                 <TableCell align="right">
-                                    <IconButton size="small" onClick={() => handleOpenEditModal(template)}><EditIcon fontSize="small" /></IconButton>
-                                    <IconButton size="small" onClick={() => handleOpenDeleteDialog(template)}><DeleteIcon fontSize="small" /></IconButton>
+                                    <Tooltip title="Duplicate">
+                                        <IconButton size="small" onClick={() => handleDuplicateTemplate(template.id)}><ContentCopyIcon fontSize="small" /></IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="Edit">
+                                        <IconButton size="small" onClick={() => handleOpenEditModal(template)}><EditIcon fontSize="small" /></IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="Delete">
+                                        <IconButton size="small" onClick={() => handleOpenDeleteDialog(template)}><DeleteIcon fontSize="small" /></IconButton>
+                                    </Tooltip>
                                 </TableCell>
                             </TableRow>
                         ))}
@@ -581,7 +643,7 @@ const ManageTemplates = () => {
                 Manage Templates
             </Typography>
             <OnboardingTemplates taskTemplates={taskTemplates} fetchTaskTemplates={fetchTaskTemplates} />
-            <TaskTemplates taskTemplates={taskTemplates} fetchTaskTemplates={fetchTaskTemplates} />
+            <TaskTemplates taskTemplates={taskTemplates} setTaskTemplates={setTaskTemplates} fetchTaskTemplates={fetchTaskTemplates} />
         </Container>
     );
 };

@@ -4,7 +4,12 @@ import { findUserByEmail, createUser } from '../models/userModel.js';
 
 const SECRET_KEY = process.env.SECRET_KEY;
 
-export const registerUser = async (email, name, password, role = 'user') => {
+export const registerUser = async (userData) => {
+    const { email, password, name } = userData;
+    if (!email || !password || !name) {
+        throw new Error('Email, password, and name are required fields.');
+    }
+
     console.log(`[authService] Registering user: ${email}`);
     
     console.log('[authService] Checking if user exists...');
@@ -18,9 +23,16 @@ export const registerUser = async (email, name, password, role = 'user') => {
     console.log('[authService] Hashing password...');
     const hashedPassword = await bcrypt.hash(password, 10);
     console.log('[authService] Password hashed successfully.');
+    
+    // Prepare user data for creation, replacing password with the hash
+    const userToCreate = {
+        ...userData,
+        password_hash: hashedPassword,
+    };
+    delete userToCreate.password;
 
     console.log('[authService] Creating user in database...');
-    const newUser = await createUser(email, name, hashedPassword, role);
+    const newUser = await createUser(userToCreate);
     console.log('[authService] User created successfully.');
     
     return newUser;

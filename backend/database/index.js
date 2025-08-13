@@ -24,7 +24,7 @@ const pool = new Pool({
 
 pool.on('error', (err, client) => {
     console.error('DATABASE POOL ERROR:', err);
-    process.exit(-1);
+    // process.exit(-1); // This is too aggressive and can crash the service
 });
 
 console.log('Database pool created.');

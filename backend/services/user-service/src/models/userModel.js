@@ -13,11 +13,29 @@ export const findUserByEmail = async (email) => {
     return rows[0];
 };
 
-export const createUser = async (email, name, password_hash, role) => {
-    const { rows } = await pool.query(
-        'INSERT INTO users (email, name, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id, email, name, role',
-        [email, name, password_hash, role]
+export const createUser = async (userData) => {
+    // Filter out keys that should not be manually inserted or are empty
+    const fields = Object.keys(userData).filter(key => 
+        !['id', 'created_at', 'updated_at'].includes(key) && userData[key] !== '' && userData[key] !== null && userData[key] !== undefined
     );
+    
+    if (fields.length === 0) {
+        throw new Error("No valid fields provided for user creation.");
+    }
+
+    const sanitizedColumns = fields.map(sanitizeColumnName).join(', ');
+    const valuePlaceholders = fields.map((_, index) => `$${index + 1}`).join(', ');
+    const values = fields.map(field => userData[field]);
+    
+    const returningColumns = "id, email, name, role";
+
+    const query = `
+        INSERT INTO users (${sanitizedColumns}) 
+        VALUES (${valuePlaceholders}) 
+        RETURNING ${returningColumns}
+    `;
+
+    const { rows } = await pool.query(query, values);
     return rows[0];
 };
 
@@ -32,8 +50,14 @@ export const findUserById = async (id) => {
 }
 
 export const updateUser = async (id, userData) => {
-    // Dynamically build the SET clause to handle any user field
-    const fields = Object.keys(userData).filter(key => key !== 'id');
+    // Dynamically build the SET clause, filtering out protected fields
+    const fields = Object.keys(userData).filter(key => !['id', 'created_at', 'updated_at'].includes(key));
+    
+    if (fields.length === 0) {
+        // If there are no fields to update, just return the current user data
+        return findUserById(id);
+    }
+
     const setClause = fields.map((field, index) => `${sanitizeColumnName(field)} = $${index + 1}`).join(', ');
     const values = fields.map(field => userData[field]);
     
@@ -44,8 +68,8 @@ export const updateUser = async (id, userData) => {
     return rows[0];
 }
 
-export const deleteUser = async (id) => {
-    await pool.query('DELETE FROM users WHERE id = $1', [id]);
+export const deleteUser = async (id, client = pool) => {
+    await client.query('DELETE FROM users WHERE id = $1', [id]);
 }
 
 export const findUserFields = async () => {

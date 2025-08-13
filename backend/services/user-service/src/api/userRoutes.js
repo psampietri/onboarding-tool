@@ -69,7 +69,11 @@ router.put('/:id', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
     try {
-        await deleteUser(req.params.id);
+        const { newOwnerId } = req.body;
+        if (!newOwnerId) {
+            return res.status(400).json({ error: 'A new owner ID is required to reassign assets.' });
+        }
+        await deleteUser(req.params.id, newOwnerId);
         res.status(204).send();
     } catch (error) {
         res.status(500).json({ error: 'Failed to delete user.' });

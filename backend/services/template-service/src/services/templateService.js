@@ -20,6 +20,10 @@ export const deleteOnboardingTemplate = async (id) => {
     return await TemplateModel.deleteOnboardingTemplate(id);
 };
 
+export const duplicateOnboardingTemplate = async (templateId, createdBy) => {
+    return await TemplateModel.duplicateOnboardingTemplate(templateId, createdBy);
+};
+
 export const createTaskTemplate = async (templateData) => {
     // The model function already handles dependencies, so we just pass the data through.
     return await TemplateModel.createTaskTemplate(templateData);
@@ -40,4 +44,8 @@ export const updateTaskTemplate = async (id, templateData) => {
 
 export const deleteTaskTemplate = async (id) => {
     return await TemplateModel.deleteTaskTemplate(id);
+};
+
+export const duplicateTaskTemplate = async (templateId, createdBy) => {
+    return await TemplateModel.duplicateTaskTemplate(templateId, createdBy);
 };

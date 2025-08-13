@@ -5,8 +5,8 @@ const router = Router();
 
 router.post('/register', async (req, res) => {
     try {
-        const { email, name, password, role } = req.body;
-        const newUser = await registerUser(email, name, password, role);
+        // Pass the entire request body to the registerUser service
+        const newUser = await registerUser(req.body);
         res.status(201).json(newUser);
     } catch (error) {
         res.status(400).json({ error: error.message });
