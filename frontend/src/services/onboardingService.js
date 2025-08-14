@@ -1,3 +1,4 @@
+// frontend/src/services/onboardingService.js
 import api from './api';
 
 export const getOnboardingInstances = async () => {
@@ -39,8 +40,8 @@ export const getOnboardingStatusForUser = async () => {
     return response.data;
 };
 
-export const updateTaskStatus = async (taskId, status) => {
-    const response = await api.put(`/onboarding/tasks/${taskId}`, { status });
+export const updateTaskStatus = async (taskId, status, ticketInfo = null) => {
+    const response = await api.put(`/onboarding/tasks/${taskId}`, { status, ticketInfo });
     return response.data;
 };
 

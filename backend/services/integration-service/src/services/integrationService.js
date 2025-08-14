@@ -1,4 +1,4 @@
-// psampietri/onboarding-tool/onboarding-tool-c4425792da692bb2c6dbce1b97f9a5d699b36ad9/backend/services/integration-service/src/services/integrationService.js
+// backend/services/integration-service/src/services/integrationService.js
 import axios from 'axios';
 import 'dotenv/config';
 

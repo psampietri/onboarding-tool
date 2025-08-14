@@ -1,4 +1,4 @@
-// psampietri/onboarding-tool/onboarding-tool-c4425792da692bb2c6dbce1b97f9a5d699b36ad9/backend/services/onboarding-service/src/services/onboardingService.js
+// backend/services/onboarding-service/src/services/onboardingService.js
 import * as OnboardingModel from '../models/onboardingModel.js';
 import * as IntegrationService from '../../../integration-service/src/services/integrationService.js';
 import * as UserService from '../../../user-service/src/services/userService.js';
@@ -20,7 +20,11 @@ export const getTasksByUserId = async (userId) => {
 };
 
 export const updateTaskStatus = async (taskId, { status, ticketInfo }) => {
-    return await OnboardingModel.updateTaskInstance(taskId, status, ticketInfo);
+    const fieldsToUpdate = { status };
+    if (ticketInfo !== undefined) {
+        fieldsToUpdate.ticket_info = ticketInfo;
+    }
+    return await OnboardingModel.updateTaskInstance(taskId, fieldsToUpdate);
 };
 
 export const executeAutomatedTask = async (taskId) => {
@@ -33,7 +37,11 @@ export const executeAutomatedTask = async (taskId) => {
     const result = await IntegrationService.createJiraTicket(task.config.jira, user);
     
     // Update task with ticket info and set as completed
-    return await OnboardingModel.updateTaskInstance(taskId, 'completed', result);
+    const fieldsToUpdate = {
+        status: 'completed',
+        ticket_info: result
+    };
+    return await OnboardingModel.updateTaskInstance(taskId, fieldsToUpdate);
 };
 
 export const dryRunAutomatedTask = async (taskId) => {
