@@ -51,13 +51,17 @@ CREATE TABLE onboarding_instances (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Task Instances Table
+-- Task Instances Table (Updated)
 CREATE TABLE task_instances (
     id SERIAL PRIMARY KEY,
     onboarding_instance_id INTEGER REFERENCES onboarding_instances(id) ON DELETE CASCADE,
     task_template_id INTEGER REFERENCES task_templates(id) ON DELETE CASCADE,
     status VARCHAR(50) NOT NULL DEFAULT 'not_started' CHECK (status IN ('not_started', 'in_progress', 'completed', 'blocked')),
-    ticket_info JSONB, -- For manual access request ticket details
+    ticket_info JSONB,
+    issue_key TEXT,
+    is_bypassed BOOLEAN DEFAULT FALSE,
+    started_at TIMESTAMP WITH TIME ZONE,
+    closed_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );

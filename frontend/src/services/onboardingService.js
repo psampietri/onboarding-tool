@@ -30,19 +30,26 @@ export const deleteOnboardingInstance = async (instanceId) => {
     return response.data;
 };
 
-// --- User-specific functions ---
-
 export const getOnboardingStatusForUser = async () => {
     const user = JSON.parse(localStorage.getItem('user'));
     if (!user || !user.id) {
-        // Return an empty array or throw an error if the user is not logged in
         return []; 
     }
     const response = await api.get(`/onboarding/users/${user.id}/tasks`);
     return response.data;
 };
 
-export const updateTaskStatus = async (taskId, status, ticketInfo = null) => {
-    const response = await api.put(`/onboarding/tasks/${taskId}`, { status, ticketInfo });
+export const updateTaskStatus = async (taskId, status) => {
+    const response = await api.put(`/onboarding/tasks/${taskId}`, { status });
+    return response.data;
+};
+
+export const associateTicket = async (taskId, issueKey) => {
+    const response = await api.post(`/onboarding/tasks/${taskId}/associate`, { issue_key: issueKey });
+    return response.data;
+};
+
+export const unassignTicket = async (taskId) => {
+    const response = await api.post(`/onboarding/tasks/${taskId}/unassign`);
     return response.data;
 };

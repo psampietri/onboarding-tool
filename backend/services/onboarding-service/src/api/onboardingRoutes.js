@@ -26,7 +26,6 @@ router.get('/instances/:id', async (req, res) => {
     res.json(instance);
 });
 
-// Update an onboarding instance
 router.put('/instances/:id', async (req, res) => {
     try {
         const updatedInstance = await OnboardingService.updateOnboardingInstance(req.params.id, req.body);
@@ -40,7 +39,6 @@ router.put('/instances/:id', async (req, res) => {
     }
 });
 
-// Delete an onboarding instance
 router.delete('/instances/:id', async (req, res) => {
     try {
         await OnboardingService.deleteOnboardingInstance(req.params.id);
@@ -54,7 +52,6 @@ router.delete('/instances/:id', async (req, res) => {
 
 // --- Task Instances ---
 
-// Get all tasks for a specific user
 router.get('/users/:userId/tasks', async (req, res) => {
     try {
         const tasks = await OnboardingService.getTasksByUserId(req.params.userId);
@@ -65,10 +62,10 @@ router.get('/users/:userId/tasks', async (req, res) => {
     }
 });
 
-// Update a specific task instance
 router.put('/tasks/:id', async (req, res) => {
     try {
-        const updatedTask = await OnboardingService.updateTaskStatus(req.params.id, req.body);
+        const { status } = req.body;
+        const updatedTask = await OnboardingService.updateTaskStatus(req.params.id, status);
         res.json(updatedTask);
     } catch (error) {
         res.status(400).json({ error: error.message });
@@ -95,5 +92,45 @@ router.post('/tasks/:id/dry-run', async (req, res) => {
     }
 });
 
+router.post('/tasks/:id/associate', async (req, res) => {
+    try {
+        const { issue_key } = req.body;
+        const result = await OnboardingService.associateTicket(req.params.id, issue_key);
+        res.json(result);
+    } catch (error) {
+        console.error("Association Error:", error);
+        res.status(400).json({ error: error.message });
+    }
+});
+
+router.post('/tasks/:id/unassign', async (req, res) => {
+    try {
+        const result = await OnboardingService.unassignTicket(req.params.id);
+        res.json(result);
+    } catch (error) {
+        console.error("Unassign Error:", error);
+        res.status(400).json({ error: error.message });
+    }
+});
+
+router.post('/tasks/:id/manual-complete', async (req, res) => {
+    try {
+        const result = await OnboardingService.markAsComplete(req.params.id);
+        res.json(result);
+    } catch (error) {
+        console.error("Manual Completion Error:", error);
+        res.status(400).json({ error: error.message });
+    }
+});
+
+router.post('/tasks/:id/bypass', async (req, res) => {
+    try {
+        const result = await OnboardingService.bypassDependency(req.params.id);
+        res.json(result);
+    } catch (error) {
+        console.error("Bypass Error:", error);
+        res.status(400).json({ error: error.message });
+    }
+});
 
 export default router;

@@ -1,3 +1,4 @@
+// psampietri/onboarding-tool/onboarding-tool-c4425792da692bb2c6dbce1b97f9a5d699b36ad9/backend/services/integration-service/src/services/integrationService.js
 import axios from 'axios';
 import 'dotenv/config';
 
@@ -10,6 +11,7 @@ const jiraApi = axios.create({
         'Authorization': `Bearer ${JIRA_API_TOKEN}`,
         'Content-Type': 'application/json',
     },
+    timeout: 30000 // 30-second timeout
 });
 
 export const getServiceDesks = async (platform, configKey) => {
@@ -46,15 +48,34 @@ export const prepareJiraTicketPayload = (jiraConfig, user) => {
 
     for (const fieldId in fieldMappings) {
         const mapping = fieldMappings[fieldId];
-        if (mapping.type === 'static') {
-            requestFieldValues[fieldId] = mapping.value;
-        } else if (mapping.type === 'dynamic' && user[mapping.value]) {
-            // Jira's reporter field often requires an object with emailAddress
-            if (fieldId === 'reporter') {
-                requestFieldValues[fieldId] = { emailAddress: user[mapping.value] };
+        let value;
+        if (mapping.type === 'dynamic') {
+            value = user[mapping.value];
+        } else {
+            value = mapping.value;
+        }
+
+        const isNumeric = (val) => !isNaN(parseFloat(val)) && isFinite(val);
+
+        if (mapping.jiraSchema) {
+            const { type, items } = mapping.jiraSchema;
+
+            if (type === 'array' && items === 'user') {
+                requestFieldValues[fieldId] = Array.isArray(value) ? value.map(v => ({ name: v })) : [{ name: value }];
+            } else if (type === 'user') {
+                requestFieldValues[fieldId] = { name: value };
+            } else if (type === 'array' && items === 'option') {
+                const values = Array.isArray(value) ? value : [value];
+                requestFieldValues[fieldId] = values.map(v => (isNumeric(v) ? { id: v.toString() } : { value: v }));
+            } else if (type === 'option') {
+                requestFieldValues[fieldId] = isNumeric(value) ? { id: value.toString() } : { value: value };
+            } else if (type === 'array') {
+                requestFieldValues[fieldId] = Array.isArray(value) ? value : [value];
             } else {
-                requestFieldValues[fieldId] = user[mapping.value];
+                requestFieldValues[fieldId] = value;
             }
+        } else {
+            requestFieldValues[fieldId] = value;
         }
     }
 
@@ -73,7 +94,6 @@ export const createJiraTicket = async (jiraConfig, user) => {
 
 export const getJiraTicket = async (platform, ticketKey) => {
     try {
-        // Using the generic Jira issue API endpoint which works for service desk tickets too
         const response = await jiraApi.get(`/rest/api/3/issue/${ticketKey}`);
         return response.data;
     } catch (error) {

@@ -1,3 +1,4 @@
+// psampietri/onboarding-tool/onboarding-tool-c4425792da692bb2c6dbce1b97f9a5d699b36ad9/backend/services/onboarding-service/src/services/onboardingService.js
 import * as OnboardingModel from '../models/onboardingModel.js';
 import * as IntegrationService from '../../../integration-service/src/services/integrationService.js';
 import * as UserService from '../../../user-service/src/services/userService.js';
@@ -42,7 +43,6 @@ export const dryRunAutomatedTask = async (taskId) => {
     }
 
     const user = await UserService.getUserById(task.user_id);
-    // This function is synchronous, so no await is needed
     const payload = IntegrationService.prepareJiraTicketPayload(task.config.jira, user);
 
     return {

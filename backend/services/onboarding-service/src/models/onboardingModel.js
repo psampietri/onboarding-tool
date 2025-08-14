@@ -129,10 +129,14 @@ export const findTasksByUserId = async (userId) => {
     return rows;
 };
 
-export const updateTaskInstance = async (taskId, status, ticketInfo) => {
+export const updateTaskInstance = async (taskId, fields) => {
+    const fieldEntries = Object.entries(fields);
+    const setClause = fieldEntries.map(([key], i) => `"${key}" = $${i + 1}`).join(', ');
+    const values = fieldEntries.map(([, value]) => value);
+
     const { rows } = await pool.query(
-        'UPDATE task_instances SET status = $1, ticket_info = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 RETURNING *',
-        [status, ticketInfo, taskId]
+        `UPDATE task_instances SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = $${fieldEntries.length + 1} RETURNING *`,
+        [...values, taskId]
     );
     return rows[0];
 };
@@ -149,9 +153,7 @@ export const deleteOnboardingInstance = async (id) => {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
-        // First, delete the associated task instances
         await client.query('DELETE FROM task_instances WHERE onboarding_instance_id = $1', [id]);
-        // Then, delete the onboarding instance itself
         await client.query('DELETE FROM onboarding_instances WHERE id = $1', [id]);
         await client.query('COMMIT');
     } catch (e) {

@@ -1,3 +1,4 @@
+// psampietri/onboarding-tool/onboarding-tool-c4425792da692bb2c6dbce1b97f9a5d699b36ad9/frontend/src/pages/admin/OnboardingInstanceDetail.jsx
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
@@ -42,7 +43,7 @@ const OnboardingInstanceDetail = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [taskLoading, setTaskLoading] = useState(null);
-    const [activeTab, setActiveTab] = useState('table'); // 'table', 'timeline', 'kanban', 'tree'
+    const [activeTab, setActiveTab] = useState('table');
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [dryRunModalOpen, setDryRunModalOpen] = useState(false);
     const [dryRunResult, setDryRunResult] = useState(null);
@@ -204,7 +205,6 @@ const OnboardingInstanceDetail = () => {
         const isAutomated = task.task_type === 'automated_access_request';
         const hasTicket = task.ticket_info && task.ticket_info.key;
 
-        // Default to manual entry if not automated, or if automated but no ticket exists yet
         setIsManualTicketEntry(!isAutomated || (isAutomated && !hasTicket));
 
         if (isAutomated && hasTicket) {
@@ -323,7 +323,6 @@ const OnboardingInstanceDetail = () => {
                 </Typography>
                 
                 <Grid container spacing={3}>
-                    {/* Summary Card */}
                     <Grid item xs={12} md={6}>
                         <Paper sx={{ p: 3 }}>
                             <Typography variant="h6" gutterBottom>Onboarding Summary</Typography>
@@ -360,7 +359,6 @@ const OnboardingInstanceDetail = () => {
                         </Paper>
                     </Grid>
                     
-                    {/* Stats Card */}
                     <Grid item xs={12} md={6}>
                         <Paper sx={{ p: 3 }}>
                             <Typography variant="h6" gutterBottom>Task Statistics</Typography>
@@ -403,7 +401,6 @@ const OnboardingInstanceDetail = () => {
                 </Grid>
             </Box>
             
-            {/* View selector buttons */}
             <Paper sx={{ mb: 2 }}>
                 <Box sx={{ display: 'flex', p: 1 }}>
                     <Button 
@@ -417,7 +414,7 @@ const OnboardingInstanceDetail = () => {
                         variant={activeTab === 'timeline' ? 'contained' : 'text'} 
                         onClick={() => setActiveTab('timeline')}
                         sx={{ mx: 1 }}
-                        disabled // Timeline view is currently disabled
+                        disabled
                     >
                         Timeline View
                     </Button>
@@ -438,7 +435,6 @@ const OnboardingInstanceDetail = () => {
                 </Box>
             </Paper>
             
-            {/* Table View */}
             {activeTab === 'table' && (
                 <TableContainer component={Paper}>
                     <Table>
@@ -529,7 +525,6 @@ const OnboardingInstanceDetail = () => {
                 </TableContainer>
             )}
             
-            {/* Kanban View */}
             {activeTab === 'kanban' && (
                 <Grid container spacing={2}>
                     {['not_started', 'in_progress', 'completed', 'blocked'].map(status => (
@@ -563,7 +558,6 @@ const OnboardingInstanceDetail = () => {
                 </Grid>
             )}
 
-            {/* Tree View */}
             {activeTab === 'tree' && (
                 <Paper sx={{ p: 2 }}>
                     <TreeView
