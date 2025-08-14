@@ -51,7 +51,7 @@ CREATE TABLE onboarding_instances (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Task Instances Table (Updated)
+-- Task Instances Table (Final Version)
 CREATE TABLE task_instances (
     id SERIAL PRIMARY KEY,
     onboarding_instance_id INTEGER REFERENCES onboarding_instances(id) ON DELETE CASCADE,
@@ -60,8 +60,10 @@ CREATE TABLE task_instances (
     ticket_info JSONB,
     issue_key TEXT,
     is_bypassed BOOLEAN DEFAULT FALSE,
-    started_at TIMESTAMP WITH TIME ZONE,
-    closed_at TIMESTAMP WITH TIME ZONE,
+    task_started_at TIMESTAMP WITH TIME ZONE,   -- When status moves to 'in_progress'
+    task_completed_at TIMESTAMP WITH TIME ZONE, -- When status moves to 'completed'
+    ticket_created_at TIMESTAMP WITH TIME ZONE, -- For the ticket's own lifecycle
+    ticket_closed_at TIMESTAMP WITH TIME ZONE,  -- For the ticket's own lifecycle
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );

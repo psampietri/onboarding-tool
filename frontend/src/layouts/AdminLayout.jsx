@@ -2,20 +2,16 @@
 import React, { useState } from 'react';
 import { Outlet, Link as RouterLink, useLocation, useNavigate } from 'react-router-dom';
 import { 
-    Box, AppBar, Toolbar, Typography, Drawer, List, ListItem, ListItemButton, 
-    ListItemIcon, ListItemText, IconButton, Menu, MenuItem, Avatar, Divider
+    Box, AppBar, Toolbar, Typography, IconButton, Menu, MenuItem, Avatar, Divider,
+    Tabs, Tab, Container, ListItemIcon, ListItemText // Correctly imported here
 } from '@mui/material';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import PeopleIcon from '@mui/icons-material/People';
 import AssignmentIcon from '@mui/icons-material/Assignment';
-import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import ExitToAppIcon from '@mui/icons-material/ExitToApp';
-import SettingsIcon from '@mui/icons-material/Settings';
 import EmailIcon from '@mui/icons-material/Email';
 import HistoryIcon from '@mui/icons-material/History';
 import NotificationCenter from '../components/NotificationCenter';
-
-const drawerWidth = 240;
 
 const navItems = [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/admin/dashboard' },
@@ -46,24 +42,22 @@ const AdminLayout = () => {
         navigate('/login');
     };
 
+    // Find the current tab index based on the URL path
+    const currentTab = navItems.findIndex(item => location.pathname.startsWith(item.path));
+
     return (
-        <Box sx={{ display: 'flex' }}>
-            <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
+        <Box sx={{ bgcolor: 'background.default', minHeight: '100vh', color: 'text.primary' }}>
+            <AppBar position="static" color="transparent" elevation={0} sx={{ borderBottom: 1, borderColor: 'divider' }}>
                 <Toolbar>
                     <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
                         Admin Portal
                     </Typography>
                     
-                    {/* Notification Center */}
                     <NotificationCenter />
                     
-                    {/* User Profile Menu */}
                     <div>
                         <IconButton
                             size="large"
-                            aria-label="account of current user"
-                            aria-controls="menu-appbar"
-                            aria-haspopup="true"
                             onClick={handleMenu}
                             color="inherit"
                         >
@@ -92,18 +86,8 @@ const AdminLayout = () => {
                                 </Typography>
                             </MenuItem>
                             <Divider />
-                            <MenuItem onClick={handleClose}>
-                                <ListItemIcon>
-                                    <AccountCircleIcon fontSize="small" />
-                                </ListItemIcon>
-                                <ListItemText>Profile</ListItemText>
-                            </MenuItem>
-                            <MenuItem onClick={handleClose}>
-                                <ListItemIcon>
-                                    <SettingsIcon fontSize="small" />
-                                </ListItemIcon>
-                                <ListItemText>Settings</ListItemText>
-                            </MenuItem>
+                            <MenuItem onClick={handleClose}>Profile</MenuItem>
+                            <MenuItem onClick={handleClose}>Settings</MenuItem>
                             <Divider />
                             <MenuItem onClick={handleLogout}>
                                 <ListItemIcon>
@@ -115,36 +99,43 @@ const AdminLayout = () => {
                     </div>
                 </Toolbar>
             </AppBar>
-            <Drawer
-                variant="permanent"
-                sx={{
-                    width: drawerWidth,
-                    flexShrink: 0,
-                    [`& .MuiDrawer-paper`]: { width: drawerWidth, boxSizing: 'border-box' },
-                }}
-            >
-                <Toolbar />
-                <Box sx={{ overflow: 'auto' }}>
-                    <List>
-                        {navItems.map((item) => (
-                            <ListItem key={item.text} disablePadding>
-                                <ListItemButton
-                                    component={RouterLink}
-                                    to={item.path}
-                                    selected={location.pathname === item.path}
-                                >
-                                    <ListItemIcon>{item.icon}</ListItemIcon>
-                                    <ListItemText primary={item.text} />
-                                </ListItemButton>
-                            </ListItem>
+            <Container maxWidth="lg" sx={{ py: 4 }}>
+                <header className="text-center mb-6">
+                    <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
+                        Onboarding Automation Tool
+                    </Typography>
+                    <Typography color="text.secondary" sx={{ mt: 1 }}>
+                        Create, track, and analyze your team's onboarding progress.
+                    </Typography>
+                </header>
+                
+                <Box sx={{ display: 'flex', justifyContent: 'center', mb: 4 }}>
+                    <Tabs 
+                        value={currentTab === -1 ? false : currentTab} 
+                        indicatorColor="primary"
+                        textColor="inherit"
+                    >
+                        {navItems.map((item, index) => (
+                            <Tab 
+                                key={item.text}
+                                icon={item.icon}
+                                iconPosition="start"
+                                label={item.text}
+                                component={RouterLink}
+                                to={item.path}
+                                sx={{
+                                    textTransform: 'none',
+                                    fontWeight: 600
+                                }}
+                            />
                         ))}
-                    </List>
+                    </Tabs>
                 </Box>
-            </Drawer>
-            <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
-                <Toolbar />
-                <Outlet />
-            </Box>
+                
+                <main>
+                    <Outlet />
+                </main>
+            </Container>
         </Box>
     );
 };

@@ -40,8 +40,9 @@ export const getOnboardingStatusForUser = async () => {
     return response.data;
 };
 
-export const updateTaskStatus = async (taskId, status, ticketInfo = null) => {
-    const response = await api.put(`/onboarding/tasks/${taskId}`, { status, ticketInfo });
+export const updateTaskStatus = async (taskId, status, ticketInfo = null, ticket_created_at = null, ticket_closed_at = null) => {
+    const payload = { status, ticketInfo, ticket_created_at, ticket_closed_at };
+    const response = await api.put(`/onboarding/tasks/${taskId}`, payload);
     return response.data;
 };
 

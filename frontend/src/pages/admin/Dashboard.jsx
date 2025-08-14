@@ -16,6 +16,8 @@ import FilterListIcon from '@mui/icons-material/FilterList';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 import Chip from '@mui/material/Chip';
+import TimerIcon from '@mui/icons-material/Timer';
+import ConfirmationNumberIcon from '@mui/icons-material/ConfirmationNumber';
 import { 
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, 
     ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line
@@ -39,12 +41,23 @@ const style = {
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
 
 const StatCard = ({ title, value, icon, trend = null, trendValue = null }) => (
-    <Paper sx={{ p: 2, display: 'flex', alignItems: 'center', height: '100%' }}>
-        <Box sx={{ mr: 2 }}>{icon}</Box>
+    <Paper 
+        elevation={0}
+        sx={{ 
+            p: 2, 
+            display: 'flex', 
+            alignItems: 'center', 
+            height: '100%', 
+            border: 1, 
+            borderColor: 'divider',
+            bgcolor: 'background.default'
+        }}
+    >
+        <Box sx={{ mr: 2, color: 'primary.main' }}>{icon}</Box>
         <Box sx={{ flexGrow: 1 }}>
             <Typography color="text.secondary">{title}</Typography>
             <Box sx={{ display: 'flex', alignItems: 'baseline' }}>
-                <Typography variant="h5">{value}</Typography>
+                <Typography variant="h5" sx={{ color: 'text.primary' }}>{value}</Typography>
                 {trend && (
                     <Box 
                         sx={{ 
@@ -68,9 +81,11 @@ const StatCard = ({ title, value, icon, trend = null, trendValue = null }) => (
 const AdminDashboard = () => {
     const [stats, setStats] = useState({ 
         activeOnboardings: 0, 
-        avgCompletionDays: 'N/A', 
         totalUsers: 0,
-        completionRate: 0
+        completionRate: 0,
+        averageCompletionTime: 'N/A', 
+        taskLeadTime: 'N/A',
+        ticketLeadTime: 'N/A'
     });
     const [instances, setInstances] = useState([]);
     const [filteredInstances, setFilteredInstances] = useState([]);
@@ -110,17 +125,13 @@ const AdminDashboard = () => {
             setUsers(usersRes.data);
             setTemplates(templatesRes.data);
             
-            let avgTime = 'N/A';
-            if (kpisRes.data.averageCompletionTime) {
-                const { days, hours } = kpisRes.data.averageCompletionTime;
-                avgTime = `${days || 0}d ${hours || 0}h`;
-            }
-
             setStats({
                 activeOnboardings: kpisRes.data.activeOnboardings,
                 totalUsers: kpisRes.data.totalUsers,
-                avgCompletionDays: avgTime,
-                completionRate: kpisRes.data.completionRate || 0
+                averageCompletionTime: kpisRes.data.averageCompletionTime || 'N/A',
+                completionRate: kpisRes.data.completionRate || 0,
+                taskLeadTime: kpisRes.data.taskLeadTime || 'N/A',
+                ticketLeadTime: kpisRes.data.ticketLeadTime || 'N/A'
             });
             
             setChartData(chartsRes.data);
@@ -209,46 +220,57 @@ const AdminDashboard = () => {
 
     return (
         <Container maxWidth="lg">
-            <Typography variant="h4" sx={{ mb: 4 }}>
-                Admin Dashboard
-            </Typography>
             {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
             
             {/* KPI Cards */}
             <Grid container spacing={3} sx={{ mb: 4 }}>
-                <Grid xs={12} md={3}>
+                <Grid item xs={12} md={3}>
                     <StatCard 
                         title="Active Onboardings" 
                         value={stats.activeOnboardings} 
                         icon={<AssignmentIcon color="primary" sx={{ fontSize: 40 }} />} 
                     />
                 </Grid>
-                <Grid xs={12} md={3}>
+                <Grid item xs={12} md={3}>
                     <StatCard 
                         title="Total Users" 
                         value={stats.totalUsers} 
                         icon={<PeopleIcon color="secondary" sx={{ fontSize: 40 }} />} 
                     />
                 </Grid>
-                <Grid xs={12} md={3}>
+                <Grid item xs={12} md={3}>
                     <StatCard 
-                        title="Avg. Completion Time" 
-                        value={stats.avgCompletionDays} 
+                        title="Avg. Onboarding Time" 
+                        value={stats.averageCompletionTime} 
                         icon={<BarChartIcon color="success" sx={{ fontSize: 40 }} />} 
                     />
                 </Grid>
-                <Grid xs={12} md={3}>
+                <Grid item xs={12} md={3}>
                     <StatCard 
                         title="Completion Rate" 
                         value={`${stats.completionRate}%`} 
                         icon={<AssignmentIcon color="info" sx={{ fontSize: 40 }} />} 
                     />
                 </Grid>
+                <Grid item xs={12} md={3}>
+                    <StatCard 
+                        title="Avg. Task Lead Time" 
+                        value={stats.taskLeadTime} 
+                        icon={<TimerIcon sx={{ fontSize: 40 }} />} 
+                    />
+                </Grid>
+                <Grid item xs={12} md={3}>
+                    <StatCard 
+                        title="Avg. Ticket Lead Time" 
+                        value={stats.ticketLeadTime} 
+                        icon={<ConfirmationNumberIcon color="secondary" sx={{ fontSize: 40 }} />} 
+                    />
+                </Grid>
             </Grid>
 
             {/* Charts Section */}
-            <Paper sx={{ p: 2, mb: 4 }}>
-                <Tabs value={tabValue} onChange={handleTabChange} sx={{ mb: 2 }}>
+            <Paper sx={{ p: 2, mb: 4, border: 1, borderColor: 'divider', bgcolor: 'background.default' }}>
+                <Tabs value={tabValue} onChange={handleTabChange} sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}>
                     <Tab label="Overview" />
                     <Tab label="Task Analysis" />
                 </Tabs>
@@ -256,12 +278,12 @@ const AdminDashboard = () => {
                 {/* Overview Tab */}
                 {tabValue === 0 && (
                     <Grid container spacing={3}>
-                        <Grid xs={12} md={8}>
+                        <Grid item xs={12} md={8}>
                             <Typography variant="h6" gutterBottom>Onboarding Trend (Last 14 Days)</Typography>
-                            <Paper sx={{ p: 2, height: 300 }}>
+                            <Box sx={{ height: 300 }}>
                                 <ResponsiveContainer width="100%" height="100%">
                                     <LineChart data={chartData.completionTrend}>
-                                        <CartesianGrid strokeDasharray="3 3" />
+                                        <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
                                         <XAxis dataKey="date" />
                                         <YAxis />
                                         <RechartsTooltip />
@@ -270,11 +292,11 @@ const AdminDashboard = () => {
                                         <Line type="monotone" dataKey="started" stroke="#82ca9d" />
                                     </LineChart>
                                 </ResponsiveContainer>
-                            </Paper>
+                            </Box>
                         </Grid>
-                        <Grid xs={12} md={4}>
+                        <Grid item xs={12} md={4}>
                             <Typography variant="h6" gutterBottom>Status Distribution</Typography>
-                            <Paper sx={{ p: 2, height: 300, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                            <Box sx={{ height: 300, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                                 <ResponsiveContainer width="100%" height="100%">
                                     <PieChart>
                                         <Pie
@@ -295,7 +317,7 @@ const AdminDashboard = () => {
                                         <RechartsTooltip />
                                     </PieChart>
                                 </ResponsiveContainer>
-                            </Paper>
+                            </Box>
                         </Grid>
                     </Grid>
                 )}
@@ -303,12 +325,12 @@ const AdminDashboard = () => {
                 {/* Task Analysis Tab */}
                 {tabValue === 1 && (
                     <Grid container spacing={3}>
-                        <Grid xs={12}>
+                        <Grid item xs={12}>
                             <Typography variant="h6" gutterBottom>Task Type Distribution</Typography>
-                            <Paper sx={{ p: 2, height: 300 }}>
+                            <Box sx={{ p: 2, height: 300 }}>
                                 <ResponsiveContainer width="100%" height="100%">
                                     <BarChart data={chartData.taskTypeDistribution}>
-                                        <CartesianGrid strokeDasharray="3 3" />
+                                        <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
                                         <XAxis dataKey="name" />
                                         <YAxis />
                                         <RechartsTooltip />
@@ -316,14 +338,14 @@ const AdminDashboard = () => {
                                         <Bar dataKey="value" fill="#8884d8" name="Number of Tasks" />
                                     </BarChart>
                                 </ResponsiveContainer>
-                            </Paper>
+                            </Box>
                         </Grid>
                     </Grid>
                 )}
             </Paper>
 
             {/* Onboarding Monitor */}
-            <Paper sx={{ p: 2 }}>
+            <Paper sx={{ p: 2, border: 1, borderColor: 'divider', bgcolor: 'background.default' }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                     <Typography variant="h6">Onboarding Monitor</Typography>
                     <Button variant="contained" onClick={handleOpenModal}>Assign Onboarding</Button>
@@ -385,7 +407,7 @@ const AdminDashboard = () => {
                                         key={inst.id} 
                                         hover 
                                         onClick={() => handleRowClick(inst.id)} 
-                                        sx={{ cursor: 'pointer' }}
+                                        sx={{ cursor: 'pointer', '&:hover': { bgcolor: 'action.hover' } }}
                                     >
                                         <TableCell>{inst.user_name}</TableCell>
                                         <TableCell>{inst.template_name}</TableCell>

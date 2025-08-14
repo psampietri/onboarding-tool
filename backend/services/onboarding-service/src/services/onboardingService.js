@@ -19,11 +19,35 @@ export const getTasksByUserId = async (userId) => {
     return await OnboardingModel.findTasksByUserId(userId);
 };
 
-export const updateTaskStatus = async (taskId, { status, ticketInfo }) => {
+export const updateTaskStatus = async (taskId, { status, ticketInfo, ticket_created_at, ticket_closed_at }) => {
+    const currentTask = await OnboardingModel.findTaskInstanceById(taskId);
+    if (!currentTask) {
+        throw new Error("Task not found");
+    }
+
     const fieldsToUpdate = { status };
+
+    // Set task_started_at only when moving to 'in_progress' for the first time
+    if (status === 'in_progress' && !currentTask.task_started_at) {
+        fieldsToUpdate.task_started_at = new Date().toISOString();
+    }
+
     if (ticketInfo !== undefined) {
         fieldsToUpdate.ticket_info = ticketInfo;
     }
+    
+    if (ticket_created_at) {
+        fieldsToUpdate.ticket_created_at = ticket_created_at;
+    }
+    if (ticket_closed_at) {
+        fieldsToUpdate.ticket_closed_at = ticket_closed_at;
+    }
+
+    // Set task_completed_at if status is 'completed'
+    if (status === 'completed') {
+        fieldsToUpdate.task_completed_at = new Date().toISOString();
+    }
+    
     return await OnboardingModel.updateTaskInstance(taskId, fieldsToUpdate);
 };
 
@@ -33,13 +57,18 @@ export const executeAutomatedTask = async (taskId) => {
         throw new Error('Task is not an automated access request.');
     }
 
+    const startTime = new Date().toISOString();
+    await OnboardingModel.updateTaskInstance(taskId, { ticket_created_at: startTime, task_started_at: startTime, status: 'in_progress' });
+
     const user = await UserService.getUserById(task.user_id);
     const result = await IntegrationService.createJiraTicket(task.config.jira, user);
     
-    // Update task with ticket info and set as completed
+    const completionTime = new Date().toISOString();
     const fieldsToUpdate = {
         status: 'completed',
-        ticket_info: result
+        ticket_info: result,
+        task_completed_at: completionTime,
+        ticket_closed_at: completionTime
     };
     return await OnboardingModel.updateTaskInstance(taskId, fieldsToUpdate);
 };

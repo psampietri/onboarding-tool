@@ -40,9 +40,11 @@ router.get('/:platform/servicedesks/:serviceDeskId/requesttypes/:requestTypeId/f
 });
 
 router.get('/:platform/requests/:ticketKey', async (req, res) => {
+    console.log(`[integrationRoutes] Attempting to fetch ticket: ${req.params.ticketKey}`);
     try {
         const { platform, ticketKey } = req.params;
         const ticketDetails = await getJiraTicket(platform, ticketKey);
+        console.log(`[integrationRoutes] Successfully fetched ticket: ${req.params.ticketKey}`);
         res.json(ticketDetails);
     } catch (error) {
         res.status(500).json({ error: error.message });

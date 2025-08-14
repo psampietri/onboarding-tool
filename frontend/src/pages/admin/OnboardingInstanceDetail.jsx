@@ -1,4 +1,3 @@
-// psampietri/onboarding-tool/onboarding-tool-c4425792da692bb2c6dbce1b97f9a5d699b36ad9/frontend/src/pages/admin/OnboardingInstanceDetail.jsx
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
@@ -8,6 +7,8 @@ import {
     LinearProgress, Stack, Divider, List, ListItem, ListItemText, ListItemIcon,
     Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, InputLabel, Modal, Link, TextField
 } from '@mui/material';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFnsV3';
+import { LocalizationProvider, DateTimePicker } from '@mui/x-date-pickers';
 import LockIcon from '@mui/icons-material/Lock';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
@@ -16,13 +17,12 @@ import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import IconButton from '@mui/material/IconButton';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import ConfirmationNumberIcon from '@mui/icons-material/ConfirmationNumber';
-import { TreeView, TreeItem } from '@mui/lab';
+import { SimpleTreeView, TreeItem } from '@mui/x-tree-view';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import api from '../../services/api';
 import { executeAutomatedTask, dryRunAutomatedTask, updateOnboardingInstance, deleteOnboardingInstance, updateTaskStatus } from '../../services/onboardingService';
 import { getTicketDetails } from '../../services/integrationService';
-
 
 const style = {
     position: 'absolute',
@@ -54,6 +54,8 @@ const OnboardingInstanceDetail = () => {
     const [ticketDetailsLoading, setTicketDetailsLoading] = useState(false);
     const [manualTicketInfo, setManualTicketInfo] = useState({ key: '', self: '' });
     const [isManualTicketEntry, setIsManualTicketEntry] = useState(false);
+    const [manualTicketCreatedDate, setManualTicketCreatedDate] = useState(null);
+    const [manualTicketClosedDate, setManualTicketClosedDate] = useState(null);
 
     const fetchInstanceDetails = async () => {
         try {
@@ -74,40 +76,63 @@ const OnboardingInstanceDetail = () => {
 
     useEffect(() => {
         if (instance?.tasks) {
-            const buildTaskTree = (tasks) => {
-                const tasksMap = new Map(tasks.map(task => [task.task_template_id, task]));
-                const adjacencyList = new Map();
+            const tasks = instance.tasks;
+            // Create maps for efficient lookups
+            const taskMap = new Map(tasks.map(task => [task.id, { ...task, children: [] }]));
+            const templateIdToTaskIdMap = new Map(tasks.map(task => [task.task_template_id, task.id]));
+            
+            const childIds = new Set();
 
-                tasks.forEach(task => {
-                    if (task.dependencies && task.dependencies.length > 0) {
-                        task.dependencies.forEach(depId => {
-                            if (!adjacencyList.has(depId)) {
-                                adjacencyList.set(depId, []);
+            // Build the full dependency graph (a DAG)
+            for (const task of taskMap.values()) {
+                if (task.dependencies && task.dependencies.length > 0) {
+                    for (const depTemplateId of task.dependencies) {
+                        const parentTaskId = templateIdToTaskIdMap.get(depTemplateId);
+                        if (parentTaskId) {
+                            const parentNode = taskMap.get(parentTaskId);
+                            if (parentNode) {
+                                parentNode.children.push(task);
+                                childIds.add(task.id);
                             }
-                            adjacencyList.get(depId).push(task.task_template_id);
-                        });
+                        }
                     }
-                });
+                }
+            }
 
-                const buildNode = (taskId) => {
-                    const taskData = tasksMap.get(taskId);
-                    const childrenIds = adjacencyList.get(taskId) || [];
-                    return {
-                        ...taskData,
-                        children: childrenIds.map(childId => buildNode(childId))
-                    };
-                };
+            // Identify the root nodes of the graph
+            const rootNodes = [];
+            for (const task of taskMap.values()) {
+                if (!childIds.has(task.id)) {
+                    rootNodes.push(task);
+                }
+            }
 
-                const rootTasks = tasks.filter(task => !task.dependencies || task.dependencies.length === 0);
-                return rootTasks.map(task => buildNode(task.task_template_id));
-            };
-            setTaskTree(buildTaskTree(instance.tasks));
+            // Traverse the graph and build a new tree structure, ensuring each node is only visited and added once.
+            // This converts the DAG into a tree that can be safely rendered.
+            const visited = new Set();
+            function buildUniqueTree(nodes) {
+                const result = [];
+                for (const node of nodes) {
+                    if (!visited.has(node.id)) {
+                        visited.add(node.id);
+                        const newNode = { ...node };
+                        if (node.children.length > 0) {
+                            newNode.children = buildUniqueTree(node.children);
+                        }
+                        result.push(newNode);
+                    }
+                }
+                return result;
+            }
+
+            const finalTree = buildUniqueTree(rootNodes);
+            setTaskTree(finalTree);
         }
     }, [instance]);
 
     const handleStatusChange = async (taskId, newStatus) => {
         try {
-            await api.put(`/onboarding/tasks/${taskId}`, { status: newStatus });
+            await updateTaskStatus(taskId, newStatus);
             fetchInstanceDetails();
         } catch (err) {
             setError('Failed to update task status.');
@@ -201,6 +226,8 @@ const OnboardingInstanceDetail = () => {
         setLiveTicketDetails(null);
         setTicketDetailsLoading(false);
         setManualTicketInfo(task.ticket_info || { key: '', self: '' });
+        setManualTicketCreatedDate(task.ticket_created_at ? new Date(task.ticket_created_at) : null);
+        setManualTicketClosedDate(task.ticket_closed_at ? new Date(task.ticket_closed_at) : null);
         
         const isAutomated = task.task_type === 'automated_access_request';
         const hasTicket = task.ticket_info && task.ticket_info.key;
@@ -224,14 +251,21 @@ const OnboardingInstanceDetail = () => {
 
     const handleSaveTicketInfo = async () => {
         try {
-            const ticketInfoToSave = {
-                ...manualTicketInfo,
-                self: manualTicketInfo.key ? `${process.env.JIRA_BASE_URL}/browse/${manualTicketInfo.key}` : manualTicketInfo.self
-            };
-            await updateTaskStatus(selectedTaskForTicket.id, selectedTaskForTicket.status, ticketInfoToSave);
+            const ticketInfoToSave = { key: manualTicketInfo.key };
+            const ticket_created_at = manualTicketCreatedDate ? manualTicketCreatedDate.toISOString() : null;
+            const ticket_closed_at = manualTicketClosedDate ? manualTicketClosedDate.toISOString() : null;
+            
+            await updateTaskStatus(
+                selectedTaskForTicket.id, 
+                selectedTaskForTicket.status, 
+                ticketInfoToSave, 
+                ticket_created_at, 
+                ticket_closed_at
+            );
             fetchInstanceDetails();
             setTicketModalOpen(false);
         } catch (err) {
+            console.error("Failed to save ticket info:", err);
             setError("Failed to save ticket information.");
         }
     };
@@ -280,34 +314,31 @@ const OnboardingInstanceDetail = () => {
         }
     };
 
-    const renderTree = (nodes, prefix = 'root') => (
-        nodes.map((node, index) => {
-            const nodeId = `${prefix}-${node.id}-${index}`;
-            return (
-                <TreeItem 
-                    key={nodeId}
-                    nodeId={nodeId}
-                    label={
-                        <Box sx={{ display: 'flex', alignItems: 'center', p: 0.5 }}>
-                            {getStatusIcon(node.status)}
-                            <Typography sx={{ ml: 1, flexGrow: 1 }}>{node.name}</Typography>
-                            <Chip label={node.status} color={getStatusChipColor(node.status)} size="small" />
-                        </Box>
-                    }
-                >
-                    {Array.isArray(node.children) && node.children.length > 0
-                        ? renderTree(node.children, nodeId)
-                        : null}
-                </TreeItem>
-            );
-        })
+    const renderTree = (nodes) => (
+        nodes.map((node) => (
+            <TreeItem 
+                key={node.id}
+                itemId={String(node.id)}
+                label={
+                    <Box sx={{ display: 'flex', alignItems: 'center', p: 0.5 }}>
+                        {getStatusIcon(node.status)}
+                        <Typography sx={{ ml: 1, flexGrow: 1 }}>{node.name}</Typography>
+                        <Chip label={node.status} color={getStatusChipColor(node.status)} size="small" />
+                    </Box>
+                }
+            >
+                {Array.isArray(node.children) && node.children.length > 0
+                    ? renderTree(node.children)
+                    : null}
+            </TreeItem>
+        ))
     );
 
     if (loading) {
         return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}><CircularProgress /></Box>;
     }
 
-    if (error) {
+    if (error && !instance) { // Only show full-page error if instance fails to load
         return <Alert severity="error">{error}</Alert>;
     }
 
@@ -316,11 +347,14 @@ const OnboardingInstanceDetail = () => {
     }
 
     return (
+        <LocalizationProvider dateAdapter={AdapterDateFns}>
         <Container maxWidth="lg">
             <Box sx={{ mb: 4 }}>
                 <Typography variant="h4" sx={{ mb: 2 }}>
                     Onboarding Details for {instance.user_name}
                 </Typography>
+                {/* Render non-critical errors here */}
+                {error && <Alert severity="warning" sx={{ mb: 2 }}>{error}</Alert>}
                 
                 <Grid container spacing={3}>
                     <Grid item xs={12} md={6}>
@@ -435,100 +469,10 @@ const OnboardingInstanceDetail = () => {
                 </Box>
             </Paper>
             
-            {activeTab === 'table' && (
-                <TableContainer component={Paper}>
-                    <Table>
-                        <TableHead>
-                            <TableRow>
-                                <TableCell>Task Name</TableCell>
-                                <TableCell>Type</TableCell>
-                                <TableCell>Status</TableCell>
-                                <TableCell>Actions</TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {instance.tasks.map((task) => {
-                                const isBlocked = blockedTasks.has(task.id);
-                                const blockers = blockedTasks.get(task.id);
-                                return (
-                                    <TableRow key={task.id} sx={{ opacity: isBlocked ? 0.6 : 1 }}>
-                                        <TableCell>
-                                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                                {task.name}
-                                                {task.instructions && (
-                                                    <Tooltip title={task.instructions}>
-                                                        <IconButton size="small" sx={{ ml: 1 }}>
-                                                            <InfoOutlinedIcon fontSize="small" />
-                                                        </IconButton>
-                                                    </Tooltip>
-                                                )}
-                                            </Box>
-                                            {task.ticket_info?.key && (
-                                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                                                    Ticket: <Link href={task.ticket_info.self} target="_blank" rel="noopener noreferrer">{task.ticket_info.key}</Link>
-                                                </Typography>
-                                            )}
-                                        </TableCell>
-                                        <TableCell>{task.task_type}</TableCell>
-                                        <TableCell>
-                                            <FormControl size="small" sx={{ minWidth: 120 }} disabled={isBlocked}>
-                                                <Select
-                                                    value={task.status}
-                                                    onChange={(e) => handleStatusChange(task.id, e.target.value)}
-                                                    renderValue={(selected) => (
-                                                        <Chip label={selected} color={getStatusChipColor(selected)} size="small" />
-                                                    )}
-                                                >
-                                                    <MenuItem value="not_started">Not Started</MenuItem>
-                                                    <MenuItem value="in_progress">In Progress</MenuItem>
-                                                    <MenuItem value="completed">Completed</MenuItem>
-                                                    <MenuItem value="blocked">Blocked</MenuItem>
-                                                </Select>
-                                            </FormControl>
-                                        </TableCell>
-                                        <TableCell>
-                                            {isBlocked && (
-                                                <Tooltip title={`Blocked by: ${blockers.join(', ')}`}>
-                                                    <IconButton><LockIcon /></IconButton>
-                                                </Tooltip>
-                                            )}
-                                            <Tooltip title="View Ticket">
-                                                <IconButton onClick={() => handleOpenTicketModal(task)}><ConfirmationNumberIcon /></IconButton>
-                                            </Tooltip>
-                                            {task.task_type === 'automated_access_request' && task.status === 'not_started' && !isBlocked && (
-                                                <>
-                                                    <Button
-                                                        variant="outlined"
-                                                        size="small"
-                                                        onClick={() => handleDryRun(task.id)}
-                                                        disabled={taskLoading === task.id}
-                                                        sx={{ mr: 1 }}
-                                                    >
-                                                        Dry Run
-                                                    </Button>
-                                                    <Button
-                                                        variant="contained"
-                                                        size="small"
-                                                        onClick={() => handleExecuteTask(task.id)}
-                                                        disabled={taskLoading === task.id}
-                                                    >
-                                                        {taskLoading === task.id ? <CircularProgress size={20} /> : 'Run'}
-                                                    </Button>
-                                                </>
-                                            )}
-                                        </TableCell>
-                                    </TableRow>
-                                );
-                            })}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
-            )}
-            
             {activeTab === 'kanban' && (
                 <Grid container spacing={2}>
                     {['not_started', 'in_progress', 'completed', 'blocked'].map(status => (
-                        <Grid item xs={12} sm={6} md={3} key={status}>
+                        <Grid item xs={12} md={3} key={status}>
                             <Paper sx={{ p: 2, bgcolor: `${getStatusChipColor(status)}.lightest`, height: '100%' }}>
                                 <Typography variant="h6" gutterBottom sx={{ textTransform: 'capitalize' }}>{status.replace('_', ' ')}</Typography>
                                 <Divider sx={{ mb: 2 }} />
@@ -560,13 +504,12 @@ const OnboardingInstanceDetail = () => {
 
             {activeTab === 'tree' && (
                 <Paper sx={{ p: 2 }}>
-                    <TreeView
-                        defaultCollapseIcon={<ExpandMoreIcon />}
-                        defaultExpandIcon={<ChevronRightIcon />}
+                    <SimpleTreeView
+                        slots={{ collapseIcon: ExpandMoreIcon, expandIcon: ChevronRightIcon }}
                         sx={{ flexGrow: 1, overflowY: 'auto' }}
                     >
                         {renderTree(taskTree)}
-                    </TreeView>
+                    </SimpleTreeView>
                 </Paper>
             )}
 
@@ -609,6 +552,26 @@ const OnboardingInstanceDetail = () => {
                                 value={manualTicketInfo.key}
                                 onChange={(e) => setManualTicketInfo(prev => ({ ...prev, key: e.target.value }))}
                             />
+                            {selectedTaskForTicket?.task_type !== 'automated_access_request' && (
+                                <Grid container spacing={2} sx={{ mt: 1 }}>
+                                    <Grid item xs={6}>
+                                        <DateTimePicker
+                                            label="Ticket Created Date"
+                                            value={manualTicketCreatedDate}
+                                            onChange={setManualTicketCreatedDate}
+                                            renderInput={(params) => <TextField {...params} fullWidth />}
+                                        />
+                                    </Grid>
+                                    <Grid item xs={6}>
+                                        <DateTimePicker
+                                            label="Ticket Closed Date"
+                                            value={manualTicketClosedDate}
+                                            onChange={setManualTicketClosedDate}
+                                            renderInput={(params) => <TextField {...params} fullWidth />}
+                                        />
+                                    </Grid>
+                                </Grid>
+                            )}
                             <DialogActions>
                                 <Button onClick={() => setTicketModalOpen(false)}>Cancel</Button>
                                 <Button onClick={handleRemoveTicketInfo} color="error">Remove</Button>
@@ -620,10 +583,10 @@ const OnboardingInstanceDetail = () => {
                             {ticketDetailsLoading ? <CircularProgress /> : (
                                 liveTicketDetails ? (
                                     <List>
-                                        <ListItem><ListItemText primary="Ticket Key" secondary={liveTicketDetails.key} /></ListItem>
-                                        <ListItem><ListItemText primary="Status" secondary={liveTicketDetails.fields.status.name} /></ListItem>
-                                        <ListItem><ListItemText primary="Created" secondary={new Date(liveTicketDetails.fields.created).toLocaleString()} /></ListItem>
-                                        <ListItem><ListItemText primary="Resolved" secondary={liveTicketDetails.fields.resolutiondate ? new Date(liveTicketDetails.fields.resolutiondate).toLocaleString() : 'Not resolved'} /></ListItem>
+                                        <ListItem><ListItemText primary="Ticket Key" secondary={liveTicketDetails.issueKey} /></ListItem>
+                                        <ListItem><ListItemText primary="Status" secondary={liveTicketDetails?.currentStatus?.status || 'N/A'} /></ListItem>
+                                        <ListItem><ListItemText primary="Created" secondary={liveTicketDetails?.createdDate?.iso8601 ? new Date(liveTicketDetails.createdDate.iso8601).toLocaleString() : 'N/A'} /></ListItem>
+                                        <ListItem><ListItemText primary="Resolved" secondary={liveTicketDetails?.currentStatus?.statusCategory === 'DONE' && liveTicketDetails?.currentStatus?.statusDate?.iso8601 ? new Date(liveTicketDetails.currentStatus.statusDate.iso8601).toLocaleString() : 'Not resolved'} /></ListItem>
                                     </List>
                                 ) : <Typography>No ticket information found.</Typography>
                             )}
@@ -633,6 +596,7 @@ const OnboardingInstanceDetail = () => {
                 </Box>
             </Modal>
         </Container>
+        </LocalizationProvider>
     );
 };
 

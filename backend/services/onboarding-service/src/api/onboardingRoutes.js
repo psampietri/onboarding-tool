@@ -64,8 +64,8 @@ router.get('/users/:userId/tasks', async (req, res) => {
 
 router.put('/tasks/:id', async (req, res) => {
     try {
-        const { status } = req.body;
-        const updatedTask = await OnboardingService.updateTaskStatus(req.params.id, status);
+        // The entire body, which includes { status, ticketInfo }, is now passed.
+        const updatedTask = await OnboardingService.updateTaskStatus(req.params.id, req.body);
         res.json(updatedTask);
     } catch (error) {
         res.status(400).json({ error: error.message });
