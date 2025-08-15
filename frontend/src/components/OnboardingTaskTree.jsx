@@ -13,7 +13,7 @@ const OnboardingTaskTree = ({
     taskTree, expandedNodes, setExpandedNodes, blockedTasks, taskLoading,
     handleStatusChange, handleOpenTicketModal, handleUnassignTicket,
     handleDryRun, handleExecuteTask, taskSearchTerm, setTaskSearchTerm,
-    taskStatusFilter, setTaskStatusFilter
+    taskStatusFilter, setTaskStatusFilter, onTaskNameClick
 }) => {
 
     const renderTree = (nodes) => (
@@ -29,6 +29,7 @@ const OnboardingTaskTree = ({
                 handleDryRun={handleDryRun}
                 handleExecuteTask={handleExecuteTask}
                 renderTree={renderTree}
+                onTaskNameClick={onTaskNameClick}
             />
         ))
     );

@@ -15,6 +15,7 @@ import OnboardingTaskTree from '../../components/OnboardingTaskTree';
 import TicketModal from '../../components/TicketModal';
 import DryRunModal from '../../components/DryRunModal';
 import DeleteInstanceDialog from '../../components/DeleteInstanceDialog';
+import TaskDetailModal from '../../components/TaskDetailModal';
 
 
 // Custom hook to get the previous value of a prop or state.
@@ -47,6 +48,8 @@ const OnboardingInstanceDetail = () => {
     const [expandedNodes, setExpandedNodes] = useState([]);
     const [taskSearchTerm, setTaskSearchTerm] = useState('');
     const [taskStatusFilter, setTaskStatusFilter] = useState('all');
+    const [detailModalOpen, setDetailModalOpen] = useState(false);
+    const [selectedTaskForDetail, setSelectedTaskForDetail] = useState(null);
     const scrollPositionRef = useRef(0);
     const { showNotification } = useNotification();
 
@@ -55,7 +58,6 @@ const OnboardingInstanceDetail = () => {
             scrollPositionRef.current = window.scrollY;
         }
         try {
-            // No need to set loading to true on refresh, avoids flickering
             if (!instance) setLoading(true);
             const response = await api.get(`/onboarding/instances/${instanceId}`);
             setInstance(response.data);
@@ -140,8 +142,6 @@ const OnboardingInstanceDetail = () => {
     const prevStatusFilter = usePrevious(taskStatusFilter);
 
     useEffect(() => {
-        // This effect now only runs when the filters themselves change.
-        // It no longer runs on a simple data refresh, which preserves the user's expanded state.
         if (taskSearchTerm !== prevSearchTerm || taskStatusFilter !== prevStatusFilter) {
             setExpandedNodes(filteredTaskTree.expandedIds);
         }
@@ -155,15 +155,8 @@ const OnboardingInstanceDetail = () => {
                 showNotification("An error occurred while updating the task.", 'error');
                 return;
             }
-
-            // Call the service with the new status, preserving existing ticket and date info
-            await updateTaskStatus(
-                taskId, 
-                newStatus, 
-                task.ticket_info, 
-                task.ticket_created_at, 
-                task.ticket_closed_at
-            );
+            
+            await updateTaskStatus(taskId, { status: newStatus, ticketInfo: task.ticket_info });
             showNotification('Task status updated successfully!', 'success');
             fetchInstanceDetails();
         } catch (err) {
@@ -216,10 +209,6 @@ const OnboardingInstanceDetail = () => {
         setDeleteDialogOpen(true);
     };
 
-    const handleCloseDeleteDialog = () => {
-        setDeleteDialogOpen(false);
-    };
-
     const handleDelete = async () => {
         try {
             await deleteOnboardingInstance(instanceId);
@@ -246,19 +235,16 @@ const OnboardingInstanceDetail = () => {
 
     const blockedTasks = useMemo(() => {
         if (!instance?.tasks) return new Map();
-        
         const tasksMap = new Map(instance.tasks.map(t => [t.task_template_id, t]));
         const completedTaskIds = new Set(
             instance.tasks.filter(t => t.status === 'completed').map(t => t.task_template_id)
         );
-        
         const blocked = new Map();
         instance.tasks.forEach(task => {
-            if (task.dependencies && task.dependencies.length > 0) {
+            if (task.dependencies?.some(depId => !completedTaskIds.has(depId))) {
                 const blockers = task.dependencies
                     .filter(depId => !completedTaskIds.has(depId))
                     .map(depId => tasksMap.get(depId)?.name || `Task ID ${depId}`);
-
                 if (blockers.length > 0) {
                     blocked.set(task.id, blockers);
                 }
@@ -301,13 +287,12 @@ const OnboardingInstanceDetail = () => {
             const ticket_created_at = manualTicketCreatedDate ? manualTicketCreatedDate.toISOString() : null;
             const ticket_closed_at = manualTicketClosedDate ? manualTicketClosedDate.toISOString() : null;
             
-            await updateTaskStatus(
-                selectedTaskForTicket.id, 
-                selectedTaskForTicket.status, 
-                ticketInfoToSave, 
+            await updateTaskStatus(selectedTaskForTicket.id, { 
+                status: selectedTaskForTicket.status, 
+                ticketInfo: ticketInfoToSave, 
                 ticket_created_at, 
-                ticket_closed_at
-            );
+                ticket_closed_at 
+            });
             showNotification('Ticket information saved successfully!', 'success');
             fetchInstanceDetails();
             setTicketModalOpen(false);
@@ -316,18 +301,11 @@ const OnboardingInstanceDetail = () => {
             showNotification("Failed to save ticket information.", 'error');
         }
     };
-
-    const handleRemoveTicketInfo = async () => {
-        try {
-            await updateTaskStatus(selectedTaskForTicket.id, selectedTaskForTicket.status, null);
-            showNotification('Ticket information removed.', 'success');
-            fetchInstanceDetails();
-            setTicketModalOpen(false);
-        } catch (err) {
-            showNotification("Failed to remove ticket information.", 'error');
-        }
+    
+    const handleTaskNameClick = (task) => {
+        setSelectedTaskForDetail(task);
+        setDetailModalOpen(true);
     };
-
 
     const progress = useMemo(() => {
         if (!instance?.tasks || instance.tasks.length === 0) return 0;
@@ -379,11 +357,12 @@ const OnboardingInstanceDetail = () => {
                     setTaskSearchTerm={setTaskSearchTerm}
                     taskStatusFilter={taskStatusFilter}
                     setTaskStatusFilter={setTaskStatusFilter}
+                    onTaskNameClick={handleTaskNameClick}
                 />
 
                 <DeleteInstanceDialog
                     open={deleteDialogOpen}
-                    onClose={handleCloseDeleteDialog}
+                    onClose={() => setDeleteDialogOpen(false)}
                     onConfirm={handleDelete}
                 />
 
@@ -406,9 +385,12 @@ const OnboardingInstanceDetail = () => {
                     manualTicketClosedDate={manualTicketClosedDate}
                     setManualTicketClosedDate={setManualTicketClosedDate}
                     onSave={handleSaveTicketInfo}
-                    onRemove={handleRemoveTicketInfo}
-                    liveTicketDetails={liveTicketDetails}
-                    ticketDetailsLoading={ticketDetailsLoading}
+                />
+
+                <TaskDetailModal
+                    open={detailModalOpen}
+                    onClose={() => setDetailModalOpen(false)}
+                    task={selectedTaskForDetail}
                 />
             </Container>
         </LocalizationProvider>

@@ -1,5 +1,13 @@
-// frontend/src/services/onboardingService.js
 import api from './api';
+
+export const getActiveOnboardingForUser = async () => {
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (!user || !user.id) {
+        return null; 
+    }
+    const response = await api.get(`/onboarding/users/${user.id}/active-onboarding`);
+    return response.data;
+};
 
 export const getOnboardingInstances = async () => {
     const response = await api.get('/onboarding/instances');
@@ -40,8 +48,7 @@ export const getOnboardingStatusForUser = async () => {
     return response.data;
 };
 
-export const updateTaskStatus = async (taskId, status, ticketInfo = null, ticket_created_at = null, ticket_closed_at = null) => {
-    const payload = { status, ticketInfo, ticket_created_at, ticket_closed_at };
+export const updateTaskStatus = async (taskId, payload) => {
     const response = await api.put(`/onboarding/tasks/${taskId}`, payload);
     return response.data;
 };
@@ -53,5 +60,37 @@ export const associateTicket = async (taskId, issueKey) => {
 
 export const unassignTicket = async (taskId) => {
     const response = await api.post(`/onboarding/tasks/${taskId}/unassign`);
+    return response.data;
+};
+
+export const getComments = async (taskId) => {
+    const response = await api.get(`/onboarding/tasks/${taskId}/comments`);
+    return response.data;
+};
+
+export const addComment = async (taskId, commentText) => {
+    const user = JSON.parse(localStorage.getItem('user'));
+    const response = await api.post(`/onboarding/tasks/${taskId}/comments`, {
+        userId: user.id,
+        commentText,
+    });
+    return response.data;
+};
+
+export const updateComment = async (commentId, commentText) => {
+    const user = JSON.parse(localStorage.getItem('user'));
+    const response = await api.put(`/onboarding/tasks/comments/${commentId}`, {
+        userId: user.id,
+        commentText,
+    });
+    return response.data;
+};
+
+export const deleteComment = async (commentId) => {
+    const user = JSON.parse(localStorage.getItem('user'));
+    // Pass userId in the body for the backend to authorize the deletion
+    const response = await api.delete(`/onboarding/tasks/comments/${commentId}`, {
+        data: { userId: user.id }
+    });
     return response.data;
 };

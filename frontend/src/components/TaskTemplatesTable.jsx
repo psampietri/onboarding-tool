@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
     Paper, Box, Typography, Button, TableContainer, Table, TableHead,
     TableRow, TableCell, TableBody, Modal, TextField, FormControl, InputLabel,
@@ -12,6 +12,7 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import api from '../services/api';
 import useJiraIntegration from '../hooks/useJiraIntegration';
 import { useNotification } from '../context/NotificationContext';
+import RichTextEditor from './RichTextEditor';
 
 const style = {
     position: 'absolute',
@@ -80,6 +81,10 @@ const TaskTemplatesTable = ({ taskTemplates, setTaskTemplates, fetchTaskTemplate
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         setCurrentTemplate(prevState => ({ ...prevState, [name]: value }));
+    };
+
+    const handleInstructionsChange = (value) => {
+        setCurrentTemplate(prevState => ({ ...prevState, instructions: value }));
     };
 
     const handleMappingChange = (jiraFieldId, mappingType, value) => {
@@ -236,7 +241,10 @@ const TaskTemplatesTable = ({ taskTemplates, setTaskTemplates, fetchTaskTemplate
                     <Typography variant="h6" component="h2">{isEditing ? 'Edit' : 'Create New'} Task Template</Typography>
                     <TextField margin="normal" required fullWidth label="Template Name" name="name" value={currentTemplate?.name || ''} onChange={handleInputChange} />
                     <TextField margin="normal" fullWidth label="Description" name="description" value={currentTemplate?.description || ''} onChange={handleInputChange} />
-                    <TextField margin="normal" fullWidth label="Instructions" name="instructions" multiline rows={3} value={currentTemplate?.instructions || ''} onChange={handleInputChange} />
+                    <FormControl fullWidth margin="normal">
+                        <Typography variant="subtitle1" sx={{ mb: 1 }}>Instructions</Typography>
+                        <RichTextEditor value={currentTemplate?.instructions || ''} onChange={handleInstructionsChange} />
+                    </FormControl>
                     <FormControl fullWidth margin="normal">
                         <InputLabel>Task Type</InputLabel>
                         <Select name="task_type" value={currentTemplate?.task_type || 'manual'} label="Task Type" onChange={handleInputChange}>

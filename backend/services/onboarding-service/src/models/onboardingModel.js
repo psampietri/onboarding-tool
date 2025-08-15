@@ -40,6 +40,48 @@ export const createOnboardingInstance = async (userId, templateId, assignedBy) =
     }
 };
 
+export const findActiveOnboardingByUserId = async (userId) => {
+    const instanceRes = await pool.query(
+        `SELECT oi.*, ot.name as template_name
+         FROM onboarding_instances oi
+         JOIN onboarding_templates ot ON oi.onboarding_template_id = ot.id
+         WHERE oi.user_id = $1 AND oi.status IN ('in_progress', 'not_started')
+         ORDER BY oi.created_at DESC
+         LIMIT 1`,
+        [userId]
+    );
+
+    if (instanceRes.rows.length === 0) {
+        return null;
+    }
+    const instance = instanceRes.rows[0];
+
+    const tasksRes = await pool.query(
+        `SELECT 
+            ti.*, 
+            tt.name, 
+            tt.description,
+            tt.instructions, 
+            tt.task_type,
+            tt.config,
+            COALESCE(deps.dependencies, '[]'::json) as dependencies
+         FROM task_instances ti
+         JOIN task_templates tt ON ti.task_template_id = tt.id
+         LEFT JOIN (
+             SELECT 
+                 task_template_id, 
+                 json_agg(depends_on_id) as dependencies
+             FROM task_template_dependencies
+             GROUP BY task_template_id
+         ) deps ON ti.task_template_id = deps.task_template_id
+         WHERE ti.onboarding_instance_id = $1
+         ORDER BY ti.id`,
+        [instance.id]
+    );
+    instance.tasks = tasksRes.rows;
+    return instance;
+};
+
 export const findAllOnboardingInstances = async () => {
     const { rows } = await pool.query(
         `SELECT oi.id, oi.status, oi.created_at, u.name as user_name, a.name as admin_name, ot.name as template_name
@@ -92,8 +134,8 @@ export const findOnboardingInstanceById = async (id) => {
     return instance;
 };
 
-export const findTaskInstanceById = async (id) => {
-    const { rows } = await pool.query(
+export const findTaskInstanceById = async (id, client = pool) => {
+    const { rows } = await client.query(
         `SELECT 
             ti.*, 
             oi.user_id,
@@ -136,16 +178,40 @@ export const findTasksByUserId = async (userId) => {
     return rows;
 };
 
-export const updateTaskInstance = async (taskId, fields) => {
+export const updateTaskInstance = async (taskId, fields, client = pool) => {
     const fieldEntries = Object.entries(fields);
     const setClause = fieldEntries.map(([key], i) => `"${key}" = $${i + 1}`).join(', ');
     const values = fieldEntries.map(([, value]) => value);
 
-    const { rows } = await pool.query(
+    const { rows } = await client.query(
         `UPDATE task_instances SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = $${fieldEntries.length + 1} RETURNING *`,
         [...values, taskId]
     );
     return rows[0];
+};
+
+export const findDependentTaskInstances = async (onboardingInstanceId, dependsOnId, client = pool) => {
+    const { rows } = await client.query(
+        `SELECT ti.id, ti.task_template_id, ti.status, ti.onboarding_instance_id
+         FROM task_instances ti
+         JOIN task_template_dependencies ttd ON ti.task_template_id = ttd.task_template_id
+         WHERE ti.onboarding_instance_id = $1 AND ttd.depends_on_id = $2`,
+        [onboardingInstanceId, dependsOnId]
+    );
+    return rows;
+};
+
+export const checkAllDependenciesComplete = async (onboardingInstanceId, taskTemplateId, client = pool) => {
+    const { rows } = await client.query(
+        `SELECT COUNT(*) as incomplete_dependencies
+         FROM task_template_dependencies ttd
+         JOIN task_instances ti ON ttd.depends_on_id = ti.task_template_id
+         WHERE ttd.task_template_id = $1
+           AND ti.onboarding_instance_id = $2
+           AND ti.status != 'completed'`,
+        [taskTemplateId, onboardingInstanceId]
+    );
+    return parseInt(rows[0].incomplete_dependencies, 10) === 0;
 };
 
 export const updateOnboardingInstance = async (id, { status }) => {
@@ -169,4 +235,44 @@ export const deleteOnboardingInstance = async (id) => {
     } finally {
         client.release();
     }
+};
+
+export const findCommentsByTaskId = async (taskId) => {
+    const { rows } = await pool.query(
+        `SELECT tc.*, u.name as user_name
+         FROM task_comments tc
+         JOIN users u ON tc.user_id = u.id
+         WHERE tc.task_instance_id = $1
+         ORDER BY tc.created_at ASC`,
+        [taskId]
+    );
+    return rows;
+};
+
+export const createComment = async (taskId, userId, commentText) => {
+    const { rows } = await pool.query(
+        `INSERT INTO task_comments (task_instance_id, user_id, comment_text)
+         VALUES ($1, $2, $3)
+         RETURNING *`,
+        [taskId, userId, commentText]
+    );
+    return rows[0];
+};
+
+export const updateComment = async (commentId, userId, commentText) => {
+    const { rows } = await pool.query(
+        `UPDATE task_comments SET comment_text = $1
+         WHERE id = $2 AND user_id = $3
+         RETURNING *`,
+        [commentText, commentId, userId]
+    );
+    return rows[0];
+};
+
+export const deleteComment = async (commentId, userId) => {
+    const { rowCount } = await pool.query(
+        `DELETE FROM task_comments WHERE id = $1 AND user_id = $2`,
+        [commentId, userId]
+    );
+    return rowCount;
 };

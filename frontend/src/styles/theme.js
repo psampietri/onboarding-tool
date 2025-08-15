@@ -7,7 +7,7 @@ const theme = createTheme({
       main: '#FA5A50', // CI&T "Bright Coral"
     },
     secondary: {
-      main: '#B4DCFA', // CI&T "Light Blue"
+      main: '#FAB9FF', // CI&T "Soft Pink"
     },
     background: {
       default: '#1A1A1A', // A sophisticated, deep charcoal
@@ -27,17 +27,8 @@ const theme = createTheme({
   },
   typography: {
     fontFamily: '"DM Sans", "Roboto", "Helvetica", "Arial", sans-serif',
-    // Apply the display font to major headings
-    h1: { fontFamily: '"Playfair Display", serif', fontWeight: 700 },
-    h2: { fontFamily: '"Playfair Display", serif', fontWeight: 700 },
-    h3: { fontFamily: '"Playfair Display", serif', fontWeight: 700 },
     h4: {
-      fontFamily: '"Playfair Display", serif',
       fontWeight: 700,
-      color: '#FFFFFF',
-    },
-    h5: {
-      fontWeight: 600,
       color: '#FFFFFF',
     },
     h6: {
@@ -46,11 +37,18 @@ const theme = createTheme({
     },
   },
   components: {
+    MuiCssBaseline: {
+      styleOverrides: {
+        '.ql-editor a': {
+          color: '#B4DCFA', // CI&T "Light Blue" for all links in the editor
+        },
+      },
+    },
     MuiPaper: {
       styleOverrides: {
         root: {
           backgroundImage: 'none',
-          borderTop: `2px solid #FA5A50`,
+          borderTop: `2px solid #FA5A50`, 
         },
       },
     },
@@ -71,7 +69,15 @@ const theme = createTheme({
             borderTop: 'none',
         }
       }
-    }
+    },
+    MuiLink: {
+      styleOverrides: {
+        root: {
+          color: '#B4DCFA', // CI&T "Light Blue" for standard MUI Links
+          textDecorationColor: '#B4DCFA',
+        },
+      },
+    },
   },
 });
 

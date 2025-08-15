@@ -62,6 +62,52 @@ router.get('/users/:userId/tasks', async (req, res) => {
     }
 });
 
+// --- Comment routes placed before generic /tasks/:id route ---
+router.put('/tasks/comments/:commentId', async (req, res) => {
+    try {
+        const { userId, commentText } = req.body;
+        const updatedComment = await OnboardingService.updateComment(req.params.commentId, userId, commentText);
+        if (!updatedComment) {
+            return res.status(404).json({ error: 'Comment not found or user not authorized.' });
+        }
+        res.json(updatedComment);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+router.delete('/tasks/comments/:commentId', async (req, res) => {
+    try {
+        const { userId } = req.body;
+        const deletedCount = await OnboardingService.deleteComment(req.params.commentId, userId);
+        if (deletedCount === 0) {
+            return res.status(404).json({ error: 'Comment not found or user not authorized.' });
+        }
+        res.status(204).send();
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to delete comment.' });
+    }
+});
+
+router.get('/tasks/:id/comments', async (req, res) => {
+    try {
+        const comments = await OnboardingService.getCommentsForTask(req.params.id);
+        res.json(comments);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to retrieve comments.' });
+    }
+});
+
+router.post('/tasks/:id/comments', async (req, res) => {
+    try {
+        const { userId, commentText } = req.body;
+        const newComment = await OnboardingService.addCommentToTask(req.params.id, userId, commentText);
+        res.status(201).json(newComment);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
 router.put('/tasks/:id', async (req, res) => {
     try {
         // The entire body, which includes { status, ticketInfo }, is now passed.

@@ -8,17 +8,17 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import ConfirmationNumberIcon from '@mui/icons-material/ConfirmationNumber';
 import LinkOffIcon from '@mui/icons-material/LinkOff';
 
 const OnboardingTaskItem = ({
     node, blockedTasks, taskLoading, handleStatusChange,
     handleOpenTicketModal, handleUnassignTicket, handleDryRun,
-    handleExecuteTask, renderTree
+    handleExecuteTask, renderTree, onTaskNameClick
 }) => {
     const isBlocked = blockedTasks.has(node.id);
-    const blockers = blockedTasks.get(node.id);
+    const hasTicket = node.ticket_info?.key;
+    const canExecute = node.task_type === 'automated_access_request' && node.status === 'not_started' && !isBlocked;
 
     const getStatusChipColor = (status) => {
         switch (status) {
@@ -44,27 +44,36 @@ const OnboardingTaskItem = ({
             itemId={String(node.id)}
             label={
                 <Box sx={{ display: 'flex', alignItems: 'center', p: 1, width: '100%', opacity: isBlocked ? 0.6 : 1 }}>
-                    {/* Left Side: Info */}
-                    <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}>
+                    {/* Column 1: Status & Name */}
+                    <Box sx={{ flex: 1, display: 'flex', alignItems: 'center' }}>
                         {getStatusIcon(node.status)}
-                        <Box sx={{ ml: 1.5 }}>
-                            <Typography>{node.name}</Typography>
-                            {node.ticket_info?.key && (
-                                <Typography variant="caption" color="text.secondary">
-                                    Ticket: <Link href={node.ticket_info.self} target="_blank" rel="noopener noreferrer">{node.ticket_info.key}</Link>
-                                </Typography>
-                            )}
-                        </Box>
-                        {node.instructions && (
-                            <Tooltip title={node.instructions}>
-                                <IconButton size="small" sx={{ ml: 1 }}><InfoOutlinedIcon fontSize="small" color="primary" /></IconButton>
+                        <Typography 
+                            onClick={() => onTaskNameClick(node)}
+                            sx={{ ml: 1.5, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
+                        >
+                            {node.name}
+                        </Typography>
+                        {isBlocked && (
+                            <Tooltip title={`Blocked by dependencies.`}>
+                                <LockIcon fontSize="small" color="disabled" sx={{ ml: 1 }} />
                             </Tooltip>
                         )}
                     </Box>
 
-                    {/* Right Side: Actions */}
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <FormControl size="small" sx={{ minWidth: 120 }} disabled={isBlocked}>
+                    {/* Column 2: Ticket Info */}
+                    <Box sx={{ flex: '0 0 150px', textAlign: 'center' }}>
+                        {hasTicket ? (
+                             <Typography variant="h7" color="text.secondary">
+                                <Link href={node.ticket_info.self} target="_blank" rel="noopener noreferrer">{node.ticket_info.key}</Link>
+                            </Typography>
+                        ) : (
+                            <Typography variant="h7" color="text.disabled">No Ticket</Typography>
+                        )}
+                    </Box>
+
+                    {/* Column 3: Status Selector */}
+                    <Box sx={{ flex: '0 0 140px' }}>
+                        <FormControl size="small" fullWidth disabled={isBlocked}>
                             <Select
                                 value={node.status}
                                 onChange={(e) => handleStatusChange(node.id, e.target.value)}
@@ -78,28 +87,28 @@ const OnboardingTaskItem = ({
                                 <MenuItem value="blocked">Blocked</MenuItem>
                             </Select>
                         </FormControl>
+                    </Box>
 
-                        {isBlocked && (
-                            <Tooltip title={`Blocked by: ${blockers.join(', ')}`}>
-                                <IconButton><LockIcon color="primary" /></IconButton>
-                            </Tooltip>
-                        )}
+                    {/* Column 4: Actions */}
+                    <Box sx={{ flex: '0 0 250px', display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
                         <Tooltip title="View/Edit Ticket">
-                            <IconButton onClick={() => handleOpenTicketModal(node)}><ConfirmationNumberIcon color="primary" /></IconButton>
+                            <span>
+                                <IconButton onClick={() => handleOpenTicketModal(node)} disabled={isBlocked}>
+                                    <ConfirmationNumberIcon color={isBlocked ? "disabled" : "primary"} />
+                                </IconButton>
+                            </span>
                         </Tooltip>
-                        {node.ticket_info?.key && (
-                            <Tooltip title="Unassign Ticket">
-                                <IconButton onClick={() => handleUnassignTicket(node.id)}><LinkOffIcon color="primary" /></IconButton>
-                            </Tooltip>
-                        )}
-                        {node.task_type === 'automated_access_request' && node.status === 'not_started' && !isBlocked && (
-                            <>
-                                <Button variant="outlined" size="small" onClick={() => handleDryRun(node.id)} disabled={taskLoading === node.id}>Dry Run</Button>
-                                <Button variant="contained" size="small" onClick={() => handleExecuteTask(node.id)} disabled={taskLoading === node.id}>
-                                    {taskLoading === node.id ? <CircularProgress size={20} /> : 'Run'}
-                                </Button>
-                            </>
-                        )}
+                         <Tooltip title="Unassign Ticket">
+                            <span>
+                                <IconButton onClick={() => handleUnassignTicket(node.id)} disabled={!hasTicket}>
+                                    <LinkOffIcon color={!hasTicket ? "disabled" : "primary"} />
+                                </IconButton>
+                            </span>
+                        </Tooltip>
+                        <Button variant="outlined" size="small" onClick={() => handleDryRun(node.id)} disabled={!canExecute || taskLoading === node.id}>Dry Run</Button>
+                        <Button variant="contained" size="small" onClick={() => handleExecuteTask(node.id)} disabled={!canExecute || taskLoading === node.id}>
+                            {taskLoading === node.id ? <CircularProgress size={20} /> : 'Run'}
+                        </Button>
                     </Box>
                 </Box>
             }

@@ -10,7 +10,7 @@ import AssignmentIcon from '@mui/icons-material/Assignment';
 import ExitToAppIcon from '@mui/icons-material/ExitToApp';
 import EmailIcon from '@mui/icons-material/Email';
 import HistoryIcon from '@mui/icons-material/History';
-import PaletteIcon from '@mui/icons-material/Palette';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import NotificationCenter from '../components/NotificationCenter';
 
 const navItems = [
@@ -40,6 +40,11 @@ const AdminLayout = () => {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         navigate('/login');
+    };
+    
+    const goToUserDashboard = () => {
+        navigate('/');
+        handleClose();
     };
 
     // Find the current tab index based on the URL path
@@ -86,8 +91,12 @@ const AdminLayout = () => {
                                 </Typography>
                             </MenuItem>
                             <Divider />
-                            <MenuItem onClick={handleClose}>Profile</MenuItem>
-                            <MenuItem onClick={handleClose}>Settings</MenuItem>
+                            <MenuItem onClick={goToUserDashboard}>
+                                <ListItemIcon>
+                                    <AccountCircleIcon fontSize="small" color="primary"/>
+                                </ListItemIcon>
+                                <ListItemText>My Onboarding</ListItemText>
+                            </MenuItem>
                             <Divider />
                             <MenuItem onClick={handleLogout}>
                                 <ListItemIcon>

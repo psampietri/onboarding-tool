@@ -111,3 +111,12 @@ CREATE TABLE audit_logs (
     user_agent TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- NEW: Task Comments Table
+CREATE TABLE task_comments (
+    id SERIAL PRIMARY KEY,
+    task_instance_id INTEGER NOT NULL REFERENCES task_instances(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    comment_text TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
