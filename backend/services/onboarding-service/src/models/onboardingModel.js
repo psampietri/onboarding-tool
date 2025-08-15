@@ -12,14 +12,21 @@ export const createOnboardingInstance = async (userId, templateId, assignedBy) =
         const instance = instanceRes.rows[0];
 
         const tasksRes = await client.query(
-            'SELECT task_template_id FROM onboarding_template_tasks WHERE onboarding_template_id = $1',
+            `SELECT tt.id AS task_template_id, array_agg(ttd.depends_on_id) AS dependencies 
+             FROM onboarding_template_tasks ott 
+             JOIN task_templates tt ON ott.task_template_id = tt.id 
+             LEFT JOIN task_template_dependencies ttd ON tt.id = ttd.task_template_id 
+             WHERE ott.onboarding_template_id = $1 
+             GROUP BY tt.id`,
             [templateId]
         );
 
         for (const task of tasksRes.rows) {
+            const hasDependencies = task.dependencies && task.dependencies[0] !== null;
+            const status = hasDependencies ? 'blocked' : 'not_started';
             await client.query(
-                'INSERT INTO task_instances (onboarding_instance_id, task_template_id) VALUES ($1, $2)',
-                [instance.id, task.task_template_id]
+                'INSERT INTO task_instances (onboarding_instance_id, task_template_id, status) VALUES ($1, $2, $3)',
+                [instance.id, task.task_template_id, status]
             );
         }
 

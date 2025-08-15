@@ -1,14 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
     Container, Typography, Paper, TableContainer, Table, TableHead,
     TableRow, TableCell, TableBody, CircularProgress, Box, Alert, Button,
     Modal, TextField, FormControl, InputLabel, Select, MenuItem, IconButton,
-    Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, List, ListItem, ListItemText
+    Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
-import api from '../../services/api';
-import { getUserFields, addUserField, deleteUserField } from '../../services/userService';
+import useUserManagement from '../../hooks/useUserManagement';
+import ManageFieldsModal from '../../components/ManageFieldsModal';
 
 const style = {
     position: 'absolute',
@@ -24,71 +24,11 @@ const style = {
     overflowY: 'auto',
 };
 
-const ManageFieldsModal = ({ open, onClose, userFields, onFieldUpdate }) => {
-    const [newFieldName, setNewFieldName] = useState('');
-    const [error, setError] = useState('');
-
-    const handleAddField = async (e) => {
-        e.preventDefault();
-        setError('');
-        try {
-            await addUserField(newFieldName);
-            setNewFieldName('');
-            onFieldUpdate(); // Callback to refresh fields in parent
-        } catch (err) {
-            setError('Failed to add field.');
-            console.error(err);
-        }
-    };
-
-    const handleDeleteField = async (fieldName) => {
-        setError('');
-        try {
-            await deleteUserField(fieldName);
-            onFieldUpdate(); // Callback to refresh fields in parent
-        } catch (err) {
-            setError('Failed to delete field.');
-            console.error(err);
-        }
-    };
-
-    return (
-        <Modal open={open} onClose={onClose}>
-            <Box sx={style}>
-                <Typography variant="h6" component="h2">Manage User Fields</Typography>
-                {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
-                <List sx={{ maxHeight: 200, overflow: 'auto', my: 2 }}>
-                    {userFields.map(field => (
-                        <ListItem key={field} secondaryAction={
-                            <IconButton edge="end" aria-label="delete" onClick={() => handleDeleteField(field)}>
-                                <DeleteIcon />
-                            </IconButton>
-                        }>
-                            <ListItemText primary={field} />
-                        </ListItem>
-                    ))}
-                </List>
-                <Box component="form" onSubmit={handleAddField} sx={{ display: 'flex', gap: 1 }}>
-                    <TextField
-                        size="small"
-                        fullWidth
-                        label="New Field Name"
-                        value={newFieldName}
-                        onChange={(e) => setNewFieldName(e.target.value)}
-                    />
-                    <Button type="submit" variant="contained">Add</Button>
-                </Box>
-            </Box>
-        </Modal>
-    );
-};
-
-
 const ManageUsers = () => {
-    const [users, setUsers] = useState([]);
-    const [userFields, setUserFields] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
+    const {
+        users, userFields, loading, error, setError,
+        handleAddField, handleDeleteField, saveUser, deleteUserById
+    } = useUserManagement();
     
     const [modalOpen, setModalOpen] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
@@ -99,28 +39,6 @@ const ManageUsers = () => {
     const [newOwnerId, setNewOwnerId] = useState('');
     
     const [fieldsModalOpen, setFieldsModalOpen] = useState(false);
-
-
-    const fetchData = async () => {
-        try {
-            setLoading(true);
-            const [usersRes, fieldsRes] = await Promise.all([
-                api.get('/users'),
-                getUserFields()
-            ]);
-            setUsers(usersRes.data);
-            setUserFields(fieldsRes);
-        } catch (err) {
-            setError('Failed to fetch user data.');
-            console.error('Fetch users error:', err);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        fetchData();
-    }, []);
 
     const handleOpenCreateModal = () => {
         setIsEditing(false);
@@ -156,13 +74,8 @@ const ManageUsers = () => {
         e.preventDefault();
         setError('');
         try {
-            if (isEditing) {
-                await api.put(`/users/${currentUser.id}`, currentUser);
-            } else {
-                await api.post('/auth/register', currentUser);
-            }
+            await saveUser(currentUser, isEditing);
             handleCloseModal();
-            fetchData(); // Refresh the list
         } catch (err) {
             setError(`Failed to ${isEditing ? 'update' : 'create'} user.`);
             console.error('Save user error:', err);
@@ -176,9 +89,8 @@ const ManageUsers = () => {
             return;
         }
         try {
-            await api.delete(`/users/${userToDelete.id}`, { data: { newOwnerId } });
+            await deleteUserById(userToDelete.id, newOwnerId);
             handleCloseDialog();
-            fetchData(); // Refresh the list
         } catch (err) {
             setError('Failed to delete user.');
             console.error('Delete user error:', err);
@@ -281,7 +193,8 @@ const ManageUsers = () => {
                 open={fieldsModalOpen} 
                 onClose={() => setFieldsModalOpen(false)} 
                 userFields={userFields}
-                onFieldUpdate={fetchData}
+                onAddField={handleAddField}
+                onDeleteField={handleDeleteField}
             />
 
             <Dialog open={dialogOpen} onClose={handleCloseDialog}>

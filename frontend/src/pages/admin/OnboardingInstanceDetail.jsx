@@ -1,50 +1,28 @@
 import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-    Container, Typography, Paper, Box, CircularProgress, Alert,
-    FormControl, Select, MenuItem, Button, Tooltip, Grid, Card, CardContent,
-    LinearProgress, Divider, List, ListItem, ListItemText,
-    Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, InputLabel, Modal, Link, TextField, Chip, InputAdornment
+    Container, Typography, Box, CircularProgress, Alert
 } from '@mui/material';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFnsV3';
-import { LocalizationProvider, DateTimePicker } from '@mui/x-date-pickers';
-import LockIcon from '@mui/icons-material/Lock';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import ErrorIcon from '@mui/icons-material/Error';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
-import IconButton from '@mui/material/IconButton';
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
-import ConfirmationNumberIcon from '@mui/icons-material/ConfirmationNumber';
-import LinkOffIcon from '@mui/icons-material/LinkOff';
-import SearchIcon from '@mui/icons-material/Search';
-import FilterListIcon from '@mui/icons-material/FilterList';
-import { SimpleTreeView, TreeItem } from '@mui/x-tree-view';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import { LocalizationProvider } from '@mui/x-date-pickers';
 import api from '../../services/api';
 import { executeAutomatedTask, dryRunAutomatedTask, updateOnboardingInstance, deleteOnboardingInstance, updateTaskStatus, unassignTicket } from '../../services/onboardingService';
 import { getTicketDetails } from '../../services/integrationService';
 
-const style = {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: 'translate(-50%, -50%)',
-    width: 600,
-    bgcolor: 'background.paper',
-    border: '2px solid #000',
-    boxShadow: 24,
-    p: 4,
-};
+import OnboardingInstanceHeader from '../../components/OnboardingInstanceHeader';
+import OnboardingTaskTree from '../../components/OnboardingTaskTree';
+import TicketModal from '../../components/TicketModal';
+import DryRunModal from '../../components/DryRunModal';
+import DeleteInstanceDialog from '../../components/DeleteInstanceDialog';
+
 
 // Custom hook to get the previous value of a prop or state.
 function usePrevious(value) {
-  const ref = useRef();
-  useEffect(() => {
-    ref.current = value;
-  });
-  return ref.current;
+    const ref = useRef();
+    useEffect(() => {
+        ref.current = value;
+    });
+    return ref.current;
 }
 
 const OnboardingInstanceDetail = () => {
@@ -360,102 +338,6 @@ const OnboardingInstanceDetail = () => {
         }, {});
     }, [instance]);
 
-    const getStatusChipColor = (status) => {
-        switch (status) {
-            case 'completed': return 'success';
-            case 'in_progress': return 'warning';
-            case 'blocked': return 'error';
-            default: return 'default';
-        }
-    };
-
-    const getStatusIcon = (status) => {
-        switch (status) {
-            case 'completed': return <CheckCircleIcon color="success" />;
-            case 'in_progress': return <AccessTimeIcon color="warning" />;
-            case 'blocked': return <ErrorIcon color="error" />;
-            default: return <HourglassEmptyIcon color="disabled" />;
-        }
-    };
-
-    const renderTree = (nodes) => (
-        nodes.map((node) => {
-            const isBlocked = blockedTasks.has(node.id);
-            const blockers = blockedTasks.get(node.id);
-            return (
-                <TreeItem 
-                    key={node.id}
-                    itemId={String(node.id)}
-                    label={
-                        <Box sx={{ display: 'flex', alignItems: 'center', p: 1, width: '100%', opacity: isBlocked ? 0.6 : 1 }}>
-                            {/* Left Side: Info */}
-                            <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}>
-                                {getStatusIcon(node.status)}
-                                <Box sx={{ ml: 1.5 }}>
-                                    <Typography>{node.name}</Typography>
-                                    {node.ticket_info?.key && (
-                                        <Typography variant="caption" color="text.secondary">
-                                            Ticket: <Link href={node.ticket_info.self} target="_blank" rel="noopener noreferrer">{node.ticket_info.key}</Link>
-                                        </Typography>
-                                    )}
-                                </Box>
-                                {node.instructions && (
-                                    <Tooltip title={node.instructions}>
-                                        <IconButton size="small" sx={{ ml: 1 }}><InfoOutlinedIcon fontSize="small" /></IconButton>
-                                    </Tooltip>
-                                )}
-                            </Box>
-
-                            {/* Right Side: Actions */}
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <FormControl size="small" sx={{ minWidth: 120 }} disabled={isBlocked}>
-                                    <Select
-                                        value={node.status}
-                                        onChange={(e) => handleStatusChange(node.id, e.target.value)}
-                                        renderValue={(selected) => (
-                                            <Chip label={selected} color={getStatusChipColor(selected)} size="small" />
-                                        )}
-                                    >
-                                        <MenuItem value="not_started">Not Started</MenuItem>
-                                        <MenuItem value="in_progress">In Progress</MenuItem>
-                                        <MenuItem value="completed">Completed</MenuItem>
-                                        <MenuItem value="blocked">Blocked</MenuItem>
-                                    </Select>
-                                </FormControl>
-
-                                {isBlocked && (
-                                    <Tooltip title={`Blocked by: ${blockers.join(', ')}`}>
-                                        <IconButton><LockIcon /></IconButton>
-                                    </Tooltip>
-                                )}
-                                <Tooltip title="View/Edit Ticket">
-                                    <IconButton onClick={() => handleOpenTicketModal(node)}><ConfirmationNumberIcon /></IconButton>
-                                </Tooltip>
-                                {node.ticket_info?.key && (
-                                    <Tooltip title="Unassign Ticket">
-                                        <IconButton onClick={() => handleUnassignTicket(node.id)}><LinkOffIcon /></IconButton>
-                                    </Tooltip>
-                                )}
-                                {node.task_type === 'automated_access_request' && node.status === 'not_started' && !isBlocked && (
-                                    <>
-                                        <Button variant="outlined" size="small" onClick={() => handleDryRun(node.id)} disabled={taskLoading === node.id}>Dry Run</Button>
-                                        <Button variant="contained" size="small" onClick={() => handleExecuteTask(node.id)} disabled={taskLoading === node.id}>
-                                            {taskLoading === node.id ? <CircularProgress size={20} /> : 'Run'}
-                                        </Button>
-                                    </>
-                                )}
-                            </Box>
-                        </Box>
-                    }
-                >
-                    {Array.isArray(node.children) && node.children.length > 0
-                        ? renderTree(node.children)
-                        : null}
-                </TreeItem>
-            );
-        })
-    );
-
     if (loading) {
         return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}><CircularProgress /></Box>;
     }
@@ -470,230 +352,64 @@ const OnboardingInstanceDetail = () => {
 
     return (
         <LocalizationProvider dateAdapter={AdapterDateFns}>
-        <Container maxWidth="lg">
-            <Box sx={{ mb: 4 }}>
-                <Typography variant="h4" sx={{ mb: 2 }}>
-                    Onboarding Details for {instance.user_name}
-                </Typography>
-                {/* Render non-critical errors here */}
-                {error && <Alert severity="warning" sx={{ mb: 2 }}>{error}</Alert>}
+            <Container maxWidth="lg">
+                <OnboardingInstanceHeader
+                    instance={instance}
+                    progress={progress}
+                    tasksByStatus={tasksByStatus}
+                    blockedTasks={blockedTasks}
+                    onStatusChange={handleInstanceStatusChange}
+                    onDelete={handleOpenDeleteDialog}
+                    error={error}
+                />
                 
-                <Grid container spacing={3}>
-                    <Grid item xs={12} md={6}>
-                        <Paper sx={{ p: 3 }}>
-                            <Typography variant="h6" gutterBottom>Onboarding Summary</Typography>
-                            <Typography><strong>User:</strong> {instance.user_name}</Typography>
-                            <FormControl fullWidth margin="normal" size="small">
-                                <InputLabel>Status</InputLabel>
-                                <Select
-                                    value={instance.status}
-                                    label="Status"
-                                    onChange={handleInstanceStatusChange}
-                                >
-                                    <MenuItem value="not_started">Not Started</MenuItem>
-                                    <MenuItem value="in_progress">In Progress</MenuItem>
-                                    <MenuItem value="completed">Completed</MenuItem>
-                                </Select>
-                            </FormControl>
-                            <Typography><strong>Assigned By:</strong> {instance.admin_name}</Typography>
-                            <Typography><strong>Start Date:</strong> {new Date(instance.created_at).toLocaleString()}</Typography>
-                            
-                            <Box sx={{ mt: 2 }}>
-                                <Typography variant="body2" gutterBottom>Overall Progress</Typography>
-                                <LinearProgress 
-                                    variant="determinate" 
-                                    value={progress} 
-                                    sx={{ height: 10, borderRadius: 5 }}
-                                />
-                                <Typography variant="caption" align="right" display="block" sx={{ mt: 0.5 }}>
-                                    {Math.round(progress)}% Complete
-                                </Typography>
-                            </Box>
-                            <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
-                                <Button color="error" onClick={handleOpenDeleteDialog}>Delete Instance</Button>
-                            </Box>
-                        </Paper>
-                    </Grid>
-                    
-                    <Grid item xs={12} md={6}>
-                        <Paper sx={{ p: 3 }}>
-                            <Typography variant="h6" gutterBottom>Task Statistics</Typography>
-                            <Grid container spacing={2}>
-                                <Grid item xs={6}>
-                                    <Card variant="outlined" sx={{ bgcolor: 'success.light', color: 'success.contrastText' }}>
-                                        <CardContent>
-                                            <Typography variant="h5">{tasksByStatus.completed?.length || 0}</Typography>
-                                            <Typography variant="body2">Completed Tasks</Typography>
-                                        </CardContent>
-                                    </Card>
-                                </Grid>
-                                <Grid item xs={6}>
-                                    <Card variant="outlined" sx={{ bgcolor: 'warning.light', color: 'warning.contrastText' }}>
-                                        <CardContent>
-                                            <Typography variant="h5">{tasksByStatus.in_progress?.length || 0}</Typography>
-                                            <Typography variant="body2">In Progress</Typography>
-                                        </CardContent>
-                                    </Card>
-                                </Grid>
-                                <Grid item xs={6}>
-                                    <Card variant="outlined" sx={{ bgcolor: 'error.light', color: 'error.contrastText' }}>
-                                        <CardContent>
-                                            <Typography variant="h5">{blockedTasks.size || 0}</Typography>
-                                            <Typography variant="body2">Blocked</Typography>
-                                        </CardContent>
-                                    </Card>
-                                </Grid>
-                                <Grid item xs={6}>
-                                    <Card variant="outlined">
-                                        <CardContent>
-                                            <Typography variant="h5">{tasksByStatus.not_started?.length || 0}</Typography>
-                                            <Typography variant="body2">Not Started</Typography>
-                                        </CardContent>
-                                    </Card>
-                                </Grid>
-                            </Grid>
-                        </Paper>
-                    </Grid>
-                </Grid>
-            </Box>
-            
-            <Paper sx={{ p: 2 }}>
-                <Box sx={{ display: 'flex', mb: 2, gap: 2 }}>
-                    <TextField
-                        variant="outlined"
-                        size="small"
-                        placeholder="Search tasks..."
-                        value={taskSearchTerm}
-                        onChange={(e) => setTaskSearchTerm(e.target.value)}
-                        sx={{ flexGrow: 1 }}
-                        InputProps={{
-                            startAdornment: (
-                                <InputAdornment position="start">
-                                    <SearchIcon />
-                                </InputAdornment>
-                            ),
-                        }}
-                    />
-                    <FormControl size="small" sx={{ minWidth: 150 }}>
-                        <InputLabel>Status</InputLabel>
-                        <Select
-                            value={taskStatusFilter}
-                            label="Status"
-                            onChange={(e) => setTaskStatusFilter(e.target.value)}
-                            startAdornment={
-                                <InputAdornment position="start">
-                                    <FilterListIcon />
-                                </InputAdornment>
-                            }
-                        >
-                            <MenuItem value="all">All Statuses</MenuItem>
-                            <MenuItem value="not_started">Not Started</MenuItem>
-                            <MenuItem value="in_progress">In Progress</MenuItem>
-                            <MenuItem value="completed">Completed</MenuItem>
-                            <MenuItem value="blocked">Blocked</MenuItem>
-                        </Select>
-                    </FormControl>
-                </Box>
-                <Divider sx={{ mb: 2 }} />
-                {filteredTaskTree.tree.length > 0 ? (
-                    <SimpleTreeView
-                        expandedItems={expandedNodes}
-                        onExpandedItemsChange={(event, ids) => setExpandedNodes(ids)}
-                        slots={{ collapseIcon: ExpandMoreIcon, expandIcon: ChevronRightIcon }}
-                        sx={{ flexGrow: 1, overflowY: 'auto' }}
-                    >
-                        {renderTree(filteredTaskTree.tree)}
-                    </SimpleTreeView>
-                ) : (
-                    <Typography sx={{ textAlign: 'center', p: 3, color: 'text.secondary' }}>
-                        No tasks match the current filters.
-                    </Typography>
-                )}
-            </Paper>
+                <OnboardingTaskTree
+                    taskTree={filteredTaskTree.tree}
+                    expandedNodes={expandedNodes}
+                    setExpandedNodes={setExpandedNodes}
+                    blockedTasks={blockedTasks}
+                    taskLoading={taskLoading}
+                    handleStatusChange={handleStatusChange}
+                    handleOpenTicketModal={handleOpenTicketModal}
+                    handleUnassignTicket={handleUnassignTicket}
+                    handleDryRun={handleDryRun}
+                    handleExecuteTask={handleExecuteTask}
+                    taskSearchTerm={taskSearchTerm}
+                    setTaskSearchTerm={setTaskSearchTerm}
+                    taskStatusFilter={taskStatusFilter}
+                    setTaskStatusFilter={setTaskStatusFilter}
+                />
 
-            <Dialog open={deleteDialogOpen} onClose={handleCloseDeleteDialog}>
-                <DialogTitle>Delete Onboarding Instance</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>
-                        Are you sure you want to delete this onboarding instance? This action cannot be undone.
-                    </DialogContentText>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={handleCloseDeleteDialog}>Cancel</Button>
-                    <Button onClick={handleDelete} color="error">Delete</Button>
-                </DialogActions>
-            </Dialog>
+                <DeleteInstanceDialog
+                    open={deleteDialogOpen}
+                    onClose={handleCloseDeleteDialog}
+                    onConfirm={handleDelete}
+                />
 
-            <Modal open={dryRunModalOpen} onClose={() => setDryRunModalOpen(false)}>
-                <Box sx={style}>
-                    <Typography variant="h6" component="h2">Dry Run Result</Typography>
-                    {dryRunResult && (
-                        <>
-                            <Typography sx={{ mt: 2 }}>{dryRunResult.message}</Typography>
-                            <Paper variant="outlined" sx={{ p: 2, mt: 1, maxHeight: 400, overflow: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-                                <pre>{JSON.stringify(dryRunResult.payload, null, 2)}</pre>
-                            </Paper>
-                        </>
-                    )}
-                </Box>
-            </Modal>
-            
-            <Modal open={ticketModalOpen} onClose={() => setTicketModalOpen(false)}>
-                <Box sx={style}>
-                    <Typography variant="h6" component="h2">Ticket Information</Typography>
-                    {isManualTicketEntry ? (
-                        <Box component="form" onSubmit={(e) => { e.preventDefault(); handleSaveTicketInfo(); }}>
-                            <TextField
-                                fullWidth
-                                label="Ticket Key"
-                                margin="normal"
-                                value={manualTicketInfo.key}
-                                onChange={(e) => setManualTicketInfo(prev => ({ ...prev, key: e.target.value }))}
-                            />
-                            {selectedTaskForTicket?.task_type !== 'automated_access_request' && (
-                                <Grid container spacing={2} sx={{ mt: 1 }}>
-                                    <Grid item xs={6}>
-                                        <DateTimePicker
-                                            label="Ticket Created Date"
-                                            value={manualTicketCreatedDate}
-                                            onChange={setManualTicketCreatedDate}
-                                            renderInput={(params) => <TextField {...params} fullWidth />}
-                                        />
-                                    </Grid>
-                                    <Grid item xs={6}>
-                                        <DateTimePicker
-                                            label="Ticket Closed Date"
-                                            value={manualTicketClosedDate}
-                                            onChange={setManualTicketClosedDate}
-                                            renderInput={(params) => <TextField {...params} fullWidth />}
-                                        />
-                                    </Grid>
-                                </Grid>
-                            )}
-                            <DialogActions>
-                                <Button onClick={() => setTicketModalOpen(false)}>Cancel</Button>
-                                <Button onClick={handleRemoveTicketInfo} color="error">Remove</Button>
-                                <Button type="submit" variant="contained">Save</Button>
-                            </DialogActions>
-                        </Box>
-                    ) : (
-                        <Box>
-                            {ticketDetailsLoading ? <CircularProgress /> : (
-                                liveTicketDetails ? (
-                                    <List>
-                                        <ListItem><ListItemText primary="Ticket Key" secondary={liveTicketDetails.issueKey} /></ListItem>
-                                        <ListItem><ListItemText primary="Status" secondary={liveTicketDetails?.currentStatus?.status || 'N/A'} /></ListItem>
-                                        <ListItem><ListItemText primary="Created" secondary={liveTicketDetails?.createdDate?.iso8601 ? new Date(liveTicketDetails.createdDate.iso8601).toLocaleString() : 'N/A'} /></ListItem>
-                                        <ListItem><ListItemText primary="Resolved" secondary={liveTicketDetails?.currentStatus?.statusCategory === 'DONE' && liveTicketDetails?.currentStatus?.statusDate?.iso8601 ? new Date(liveTicketDetails.currentStatus.statusDate.iso8601).toLocaleString() : 'Not resolved'} /></ListItem>
-                                    </List>
-                                ) : <Typography>No ticket information found.</Typography>
-                            )}
-                            <Button onClick={() => setIsManualTicketEntry(true)} sx={{ mt: 2 }}>Switch to Manual Entry</Button>
-                        </Box>
-                    )}
-                </Box>
-            </Modal>
-        </Container>
+                <DryRunModal
+                    open={dryRunModalOpen}
+                    onClose={() => setDryRunModalOpen(false)}
+                    dryRunResult={dryRunResult}
+                />
+                
+                <TicketModal
+                    open={ticketModalOpen}
+                    onClose={() => setTicketModalOpen(false)}
+                    task={selectedTaskForTicket}
+                    isManualEntry={isManualTicketEntry}
+                    setIsManualEntry={setIsManualTicketEntry}
+                    manualTicketInfo={manualTicketInfo}
+                    setManualTicketInfo={setManualTicketInfo}
+                    manualTicketCreatedDate={manualTicketCreatedDate}
+                    setManualTicketCreatedDate={setManualTicketCreatedDate}
+                    manualTicketClosedDate={manualTicketClosedDate}
+                    setManualTicketClosedDate={setManualTicketClosedDate}
+                    onSave={handleSaveTicketInfo}
+                    onRemove={handleRemoveTicketInfo}
+                    liveTicketDetails={liveTicketDetails}
+                    ticketDetailsLoading={ticketDetailsLoading}
+                />
+            </Container>
         </LocalizationProvider>
     );
 };

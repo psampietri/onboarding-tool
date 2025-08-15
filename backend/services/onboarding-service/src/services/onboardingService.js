@@ -74,6 +74,7 @@ export const executeAutomatedTask = async (taskId) => {
         const fieldsToUpdate = {
             status: 'in_progress',
             ticket_info: result,
+            issue_key: result.issueKey,
             ticket_created_at: new Date().toISOString(),
             task_started_at: new Date().toISOString() // Also mark the task as started
         };
