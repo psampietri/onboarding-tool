@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import {
-    Modal, Box, Typography, List, ListItem, ListItemText, IconButton, TextField, Button, Alert
+    Modal, Box, Typography, List, ListItem, ListItemText, IconButton, TextField, Button
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
+import { useNotification } from '../context/NotificationContext';
 
 const style = {
     position: 'absolute',
@@ -20,26 +21,30 @@ const style = {
 
 const ManageFieldsModal = ({ open, onClose, userFields, onAddField, onDeleteField }) => {
     const [newFieldName, setNewFieldName] = useState('');
-    const [error, setError] = useState('');
+    const { showNotification } = useNotification();
 
     const handleAddField = async (e) => {
         e.preventDefault();
-        setError('');
+        if (!newFieldName) {
+            showNotification('Field name cannot be empty.', 'warning');
+            return;
+        }
         try {
             await onAddField(newFieldName);
+            showNotification('Field added successfully!', 'success');
             setNewFieldName('');
         } catch (err) {
-            setError('Failed to add field.');
+            showNotification(err.response?.data?.error || 'Failed to add field.', 'error');
             console.error(err);
         }
     };
 
     const handleDeleteField = async (fieldName) => {
-        setError('');
         try {
             await onDeleteField(fieldName);
+            showNotification('Field deleted successfully!', 'success');
         } catch (err) {
-            setError('Failed to delete field.');
+            showNotification(err.response?.data?.error || 'Failed to delete field.', 'error');
             console.error(err);
         }
     };
@@ -48,7 +53,6 @@ const ManageFieldsModal = ({ open, onClose, userFields, onAddField, onDeleteFiel
         <Modal open={open} onClose={onClose}>
             <Box sx={style}>
                 <Typography variant="h6" component="h2">Manage User Fields</Typography>
-                {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
                 <List sx={{ maxHeight: 200, overflow: 'auto', my: 2 }}>
                     {userFields.map(field => (
                         <ListItem key={field} secondaryAction={

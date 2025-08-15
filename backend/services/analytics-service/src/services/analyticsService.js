@@ -1,5 +1,6 @@
 import pool from '../../../../database/index.js';
 import { subDays, format } from 'date-fns';
+import logger from '../../../../utils/logger.js';
 
 /**
  * Formats a PostgreSQL interval object into a readable "Xd Yh" string.
@@ -18,16 +19,16 @@ const formatLeadTime = (interval) => {
  */
 const getAverageTaskLeadTime = async () => {
     try {
-        console.log('[Analytics] Calculating average task lead time...');
+        logger.info('Calculating average task lead time...');
         const { rows } = await pool.query(`
             SELECT AVG(task_completed_at - task_started_at) AS avg_lead_time
             FROM task_instances
             WHERE status = 'completed' AND task_started_at IS NOT NULL AND task_completed_at IS NOT NULL;
         `);
-        console.log('[Analytics] Task lead time query successful.');
+        logger.info('Task lead time query successful.');
         return formatLeadTime(rows[0]?.avg_lead_time);
     } catch (error) {
-        console.error('[Analytics] ERROR in getAverageTaskLeadTime:', error);
+        logger.error({ err: error }, 'ERROR in getAverageTaskLeadTime:');
         throw error; // Re-throw to be caught by getKpis
     }
 };
@@ -37,16 +38,16 @@ const getAverageTaskLeadTime = async () => {
  */
 const getAverageTicketLeadTime = async () => {
     try {
-        console.log('[Analytics] Calculating average ticket lead time...');
+        logger.info('Calculating average ticket lead time...');
         const { rows } = await pool.query(`
             SELECT AVG(ticket_closed_at - ticket_created_at) AS avg_lead_time
             FROM task_instances
             WHERE ticket_info IS NOT NULL AND ticket_created_at IS NOT NULL AND ticket_closed_at IS NOT NULL;
         `);
-        console.log('[Analytics] Ticket lead time query successful.');
+        logger.info('Ticket lead time query successful.');
         return formatLeadTime(rows[0]?.avg_lead_time);
     } catch (error) {
-        console.error('[Analytics] ERROR in getAverageTicketLeadTime:', error);
+        logger.error({ err: error }, 'ERROR in getAverageTicketLeadTime:');
         throw error;
     }
 };
@@ -56,22 +57,22 @@ const getAverageTicketLeadTime = async () => {
  */
 const getAverageOnboardingTime = async () => {
     try {
-        console.log('[Analytics] Calculating average onboarding time...');
+        logger.info('Calculating average onboarding time...');
         const { rows } = await pool.query(`
             SELECT AVG(updated_at - created_at) as avg_time 
             FROM onboarding_instances 
             WHERE status = 'completed'
         `);
-        console.log('[Analytics] Onboarding time query successful.');
+        logger.info('Onboarding time query successful.');
         return formatLeadTime(rows[0]?.avg_time);
     } catch (error) {
-        console.error('[Analytics] ERROR in getAverageOnboardingTime:', error);
+        logger.error({ err: error }, 'ERROR in getAverageOnboardingTime:');
         throw error;
     }
 };
 
 export const getKpis = async () => {
-    console.log('[Analytics] getKpis called.');
+    logger.info('getKpis called.');
     try {
         const [
             instancesRes, 
@@ -86,7 +87,7 @@ export const getKpis = async () => {
             getAverageTicketLeadTime(),
             getAverageOnboardingTime()
         ]);
-        console.log('[Analytics] All KPI queries completed.');
+        logger.info('All KPI queries completed.');
 
         const activeOnboardings = instancesRes.rows.filter(i => i.status === 'in_progress').length;
         const completedOnboardings = instancesRes.rows.filter(i => i.status === 'completed').length;
@@ -103,15 +104,16 @@ export const getKpis = async () => {
             taskLeadTime,
             ticketLeadTime
         };
-        console.log('[Analytics] KPIs calculated:', kpis);
+        logger.info({ kpis }, 'KPIs calculated.');
         return kpis;
     } catch (error) {
-        console.error('[Analytics] FATAL ERROR in getKpis:', error);
+        logger.error({ err: error }, 'FATAL ERROR in getKpis:');
         throw error; // Re-throw to send 500 response
     }
 };
 
 export const getChartData = async () => {
+    logger.info('Fetching chart data.');
     const [statusDistributionRes, taskTypeDistributionRes, completionTrendRes, startedTrendRes] = await Promise.all([
         pool.query("SELECT status as name, COUNT(*) as value FROM onboarding_instances GROUP BY status"),
         pool.query(`
@@ -154,6 +156,7 @@ export const getChartData = async () => {
             trendData[dateKey].completed = parseInt(row.completed_count, 10);
         }
     });
+    logger.info('Chart data processed successfully.');
 
     return {
         statusDistribution: statusDistributionRes.rows,

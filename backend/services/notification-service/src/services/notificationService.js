@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
 import 'dotenv/config';
 import * as NotificationModel from '../models/notificationModel.js';
+import logger from '../../../../utils/logger.js';
 
 // Configure nodemailer (for a real implementation, use environment variables)
 let transporter;
@@ -15,11 +16,12 @@ try {
         }
     });
 } catch (error) {
-    console.error('Error configuring email transport:', error);
+    logger.error({ err: error }, 'Error configuring email transport:');
 }
 
 // Create an in-app notification
 export const createNotification = async (userId, title, message, type, relatedEntityType = null, relatedEntityId = null) => {
+    logger.info({ userId, type, relatedEntityId }, 'Creating in-app notification.');
     return await NotificationModel.createNotification(userId, title, message, type, relatedEntityType, relatedEntityId);
 };
 
@@ -51,7 +53,7 @@ export const deleteNotification = async (notificationId, userId) => {
 // Send an email notification
 export const sendEmailNotification = async (to, subject, html, cc = [], bcc = []) => {
     if (!transporter) {
-        console.error('Email transport not configured.');
+        logger.error('Email transport not configured.');
         return false;
     }
 
@@ -65,16 +67,17 @@ export const sendEmailNotification = async (to, subject, html, cc = [], bcc = []
             html
         });
         
-        console.log('Email sent:', info.messageId);
+        logger.info({ messageId: info.messageId, recipient: to }, 'Email sent successfully.');
         return true;
     } catch (error) {
-        console.error('Error sending email:', error);
+        logger.error({ err: error, recipient: to }, 'Error sending email:');
         return false;
     }
 };
 
 // Send notification with template
 export const sendTemplatedEmail = async (templateId, userData, recipientEmail) => {
+    logger.info({ templateId, recipientEmail }, 'Sending templated email.');
     try {
         // Get the email template
         const template = await NotificationModel.getEmailTemplateById(templateId);
@@ -96,13 +99,14 @@ export const sendTemplatedEmail = async (templateId, userData, recipientEmail) =
         // Send the email
         return await sendEmailNotification(recipientEmail, subject, html);
     } catch (error) {
-        console.error('Error sending templated email:', error);
+        logger.error({ err: error, templateId, recipientEmail }, 'Error sending templated email:');
         return false;
     }
 };
 
 // Email template management
 export const createEmailTemplate = async (name, subject, bodyTemplate, createdBy) => {
+    logger.info({ name, createdBy }, 'Creating email template.');
     return await NotificationModel.createEmailTemplate(name, subject, bodyTemplate, createdBy);
 };
 
@@ -115,9 +119,11 @@ export const getEmailTemplateById = async (id) => {
 };
 
 export const updateEmailTemplate = async (id, name, subject, bodyTemplate) => {
+    logger.info({ id, name }, 'Updating email template.');
     return await NotificationModel.updateEmailTemplate(id, name, subject, bodyTemplate);
 };
 
 export const deleteEmailTemplate = async (id) => {
+    logger.warn({ id }, 'Deleting email template.');
     return await NotificationModel.deleteEmailTemplate(id);
 };

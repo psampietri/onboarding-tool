@@ -5,6 +5,7 @@ import 'dotenv/config';
 import pool from '../../../database/index.js';
 import authRoutes from './api/authRoutes.js';
 import userRoutes from './api/userRoutes.js';
+import logger from '../../../utils/logger.js';
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -21,15 +22,15 @@ const startServer = async () => {
     try {
         // Test the database connection before starting
         const client = await pool.connect();
-        console.log('Database connection verified for user-service.');
+        logger.info('Database connection verified for user-service.');
         client.release();
 
         // If the connection is successful, start the server
         app.listen(PORT, () => {
-            console.log(`user-service listening on port ${PORT}`);
+            logger.info(`user-service listening on port ${PORT}`);
         });
     } catch (err) {
-        console.error('FATAL: user-service failed to connect to the database on startup.', err.stack);
+        logger.error({ err }, 'FATAL: user-service failed to connect to the database on startup.');
         process.exit(1);
     }
 };

@@ -1,35 +1,35 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-    Container, Typography, CircularProgress, Box, Alert
+    Container, Typography, CircularProgress, Box
 } from '@mui/material';
 import api from '../../services/api';
+import { useNotification } from '../../context/NotificationContext';
 import OnboardingTemplatesTable from '../../components/OnboardingTemplatesTable';
 import TaskTemplatesTable from '../../components/TaskTemplatesTable';
 
 const ManageTemplates = () => {
     const [taskTemplates, setTaskTemplates] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
+    const { showNotification } = useNotification();
     
-    const fetchTaskTemplates = async () => {
+    const fetchTaskTemplates = useCallback(async () => {
         try {
             setLoading(true);
             const response = await api.get('/templates/tasks');
             setTaskTemplates(response.data);
         } catch (error) {
-            setError("Failed to fetch task templates.");
+            showNotification("Failed to fetch task templates.", 'error');
             console.error("Failed to fetch task templates for parent", error);
         } finally {
             setLoading(false);
         }
-    };
+    }, [showNotification]);
 
     useEffect(() => {
         fetchTaskTemplates();
-    }, []);
+    }, [fetchTaskTemplates]);
 
     if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}><CircularProgress /></Box>;
-    if (error) return <Alert severity="error">{error}</Alert>;
 
     return (
         <Container maxWidth="lg">

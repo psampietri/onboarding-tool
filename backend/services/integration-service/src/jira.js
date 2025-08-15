@@ -1,4 +1,5 @@
 import axios from 'axios';
+import logger from '../../../utils/logger.js';
 
 let jiraApi;
 // In-memory cache for Jira field schemas to avoid repeated API calls.
@@ -21,7 +22,7 @@ export const initJira = (token, baseUrl) => {
         },
         timeout: 30000 // 30-second timeout
     });
-    console.log(`Jira integration initialized for base URL: ${baseUrl}`);
+    logger.info(`Jira integration initialized for base URL: ${baseUrl}`);
 };
 
 /**
@@ -47,13 +48,13 @@ export const callJiraApi = async (endpoint, method = 'GET', payload = null) => {
         return response.status === 204 ? { success: true } : response.data;
     } catch (error) {
         if (error.response) {
-            console.error(`Jira API Error: ${error.response.status} calling ${endpoint}`, error.response.data);
+            logger.error({ status: error.response.status, data: error.response.data, endpoint }, 'Jira API Error');
             throw { status: error.response.status, data: error.response.data };
         } else if (error.request) {
-            console.error(`Jira API Error: No response for ${endpoint}`, error.request);
+            logger.error({ endpoint, request: error.request }, 'Jira API Error: No response');
             throw new Error(`Jira API request failed. No response received.`);
         } else {
-            console.error('Jira API Setup Error:', error.message);
+            logger.error({ message: error.message }, 'Jira API Setup Error');
             throw new Error(`Jira API setup error: ${error.message}`);
         }
     }
@@ -68,8 +69,10 @@ export const callJiraApi = async (endpoint, method = 'GET', payload = null) => {
 const getRequestTypeSchema = async (serviceDeskId, requestTypeId) => {
     const cacheKey = `${serviceDeskId}-${requestTypeId}`;
     if (schemaCache.has(cacheKey)) {
+        logger.info({ cacheKey }, 'Jira schema cache hit.');
         return schemaCache.get(cacheKey);
     }
+    logger.info({ cacheKey }, 'Jira schema cache miss. Fetching from API.');
 
     const response = await callJiraApi(`/rest/servicedeskapi/servicedesk/${serviceDeskId}/requesttype/${requestTypeId}/field`);
     const fieldSchemas = new Map(response.requestTypeFields.map(field => [field.fieldId, field.jiraSchema]));
@@ -138,6 +141,7 @@ export const getJiraIssueDetails = async (issueKey) => {
         return await callJiraApi(`/rest/servicedeskapi/request/${issueKey}`);
     } catch (error) {
         if (error.status === 404) {
+            logger.warn({ issueKey }, "Ticket not found in Service Desk API, falling back to generic API.");
             // If not found, fall back to the generic Jira API for broader compatibility
             try {
                 const genericIssue = await callJiraApi(`/rest/api/2/issue/${issueKey}`);
@@ -153,7 +157,7 @@ export const getJiraIssueDetails = async (issueKey) => {
                     }
                 };
             } catch (genericError) {
-                console.error(`Failed to fetch issue ${issueKey} from both Service Desk and generic APIs.`);
+                logger.error({ err: genericError, issueKey }, `Failed to fetch issue from both Service Desk and generic APIs.`);
                 throw genericError;
             }
         }

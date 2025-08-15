@@ -1,26 +1,28 @@
 import React, { useState } from 'react';
-import { Container, TextField, Button, Typography, Box, Alert } from '@mui/material';
+import { Container, TextField, Button, Typography, Box } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { login } from '../services/authService';
+import { useNotification } from '../context/NotificationContext';
 
 const LoginPage = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [error, setError] = useState('');
     const navigate = useNavigate();
+    const { showNotification } = useNotification();
 
     const handleLogin = async (e) => {
         e.preventDefault();
-        setError('');
         try {
             const { user } = await login(email, password);
+            showNotification('Login successful!', 'success');
             if (user.role === 'admin') {
                 navigate('/admin');
             } else {
                 navigate('/');
             }
         } catch (err) {
-            setError('Login failed. Please check your credentials.');
+            const errorMessage = err.response?.data?.error || 'Login failed. Please check your credentials.';
+            showNotification(errorMessage, 'error');
             console.error('Login failed:', err);
         }
     };
@@ -39,7 +41,6 @@ const LoginPage = () => {
                     Sign in
                 </Typography>
                 <Box component="form" onSubmit={handleLogin} noValidate sx={{ mt: 1 }}>
-                    {error && <Alert severity="error" sx={{ width: '100%', mt: 2 }}>{error}</Alert>}
                     <TextField
                         margin="normal"
                         required

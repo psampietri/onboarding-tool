@@ -4,6 +4,7 @@ import bodyParser from 'body-parser';
 import 'dotenv/config';
 import pool from '../../../database/index.js';
 import notificationRoutes from './api/notificationRoutes.js';
+import logger from '../../../utils/logger.js';
 
 const app = express();
 const PORT = process.env.PORT || 5006;
@@ -14,10 +15,10 @@ app.use(bodyParser.json());
 // Test database connection
 pool.query('SELECT NOW()', (err) => {
     if (err) {
-        console.error('Database connection error:', err.stack);
+        logger.error({ err }, 'Database connection error:');
         process.exit(1);
     } else {
-        console.log('Database connection successful');
+        logger.info('Database connection successful');
     }
 });
 
@@ -30,5 +31,5 @@ app.get('/health', (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`Notification service is running on port ${PORT}`);
+    logger.info(`Notification service is running on port ${PORT}`);
 });

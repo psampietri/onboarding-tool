@@ -4,42 +4,74 @@ const theme = createTheme({
   palette: {
     mode: 'dark',
     primary: {
-      main: '#3b82f6', // A blue color similar to the reference
+      main: '#FA5A50', // CI&T "Bright Coral"
     },
     secondary: {
-      main: '#f48fb1',
+      main: '#B4DCFA', // CI&T "Light Blue"
     },
     background: {
-      default: '#0f172a', // slate-900
-      paper: '#1e293b',   // slate-800
+      default: '#1A1A1A', // A sophisticated, deep charcoal
+      paper: '#2C2C2C',   // A slightly lighter grey for surfaces
     },
     text: {
-      primary: '#e2e8f0', // slate-200
-      secondary: '#94a3b8', // slate-400
+      primary: '#F4F6F8', // A soft white for readability
+      secondary: '#B4DCFA', // CI&T "Light Blue" for secondary text
     },
     action: {
-      hover: 'rgba(59, 130, 246, 0.15)', // Lighter blue on hover
+      hover: 'rgba(250, 90, 80, 0.1)', // A subtle hover for the primary color
     },
+    info: {
+      main: '#B4DCFA', // CI&T "Light Blue"
+    },
+    divider: 'rgba(180, 220, 250, 0.2)', // A divider based on the light blue
   },
   typography: {
-    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+    fontFamily: '"DM Sans", "Roboto", "Helvetica", "Arial", sans-serif',
+    // Apply the display font to major headings
+    h1: { fontFamily: '"Playfair Display", serif', fontWeight: 700 },
+    h2: { fontFamily: '"Playfair Display", serif', fontWeight: 700 },
+    h3: { fontFamily: '"Playfair Display", serif', fontWeight: 700 },
+    h4: {
+      fontFamily: '"Playfair Display", serif',
+      fontWeight: 700,
+      color: '#FFFFFF',
+    },
+    h5: {
+      fontWeight: 600,
+      color: '#FFFFFF',
+    },
+    h6: {
+      fontWeight: 600,
+      color: '#FFFFFF',
+    },
   },
   components: {
     MuiPaper: {
       styleOverrides: {
         root: {
-          backgroundImage: 'none', // Remove gradients for a flatter look
+          backgroundImage: 'none',
+          borderTop: `2px solid #FA5A50`,
         },
       },
     },
     MuiButton: {
       styleOverrides: {
         root: {
-          textTransform: 'none', // Buttons with normal capitalization
+          textTransform: 'none',
           borderRadius: '0.5rem',
+          fontWeight: 'bold',
         },
       },
     },
+    MuiAppBar: {
+      styleOverrides: {
+        root: {
+            backgroundColor: '#1E1E1E',
+            color: '#FFFFFF',
+            borderTop: 'none',
+        }
+      }
+    }
   },
 });
 

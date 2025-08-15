@@ -1,11 +1,10 @@
-// frontend/src/pages/admin/Dashboard.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Container, Typography, Grid, Paper, Box, Button, Modal, FormControl,
     InputLabel, Select, MenuItem, Table, TableBody, TableCell, TableContainer,
-    TableHead, TableRow, CircularProgress, Alert, Dialog, DialogActions,
-    DialogContent, DialogContentText, DialogTitle, Snackbar, Tabs, Tab,
+    TableHead, TableRow, CircularProgress, Dialog, DialogActions,
+    DialogContent, DialogContentText, DialogTitle, Tabs, Tab,
     TextField, InputAdornment, IconButton, Card, CardContent
 } from '@mui/material';
 import PeopleIcon from '@mui/icons-material/People';
@@ -22,8 +21,8 @@ import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, 
     ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line
 } from 'recharts';
-import { format, subDays } from 'date-fns';
 import api from '../../services/api';
+import { useNotification } from '../../context/NotificationContext';
 
 const style = {
     position: 'absolute',
@@ -38,7 +37,7 @@ const style = {
 };
 
 // Colors for charts
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
+const COLORS = ['#FA5A50', '#000050', '#FAB9FF', '#B4DCFA'];
 
 const StatCard = ({ title, value, icon, trend = null, trendValue = null }) => (
     <Paper 
@@ -48,12 +47,11 @@ const StatCard = ({ title, value, icon, trend = null, trendValue = null }) => (
             display: 'flex', 
             alignItems: 'center', 
             height: '100%', 
-            border: 1, 
-            borderColor: 'divider',
-            bgcolor: 'background.default'
         }}
     >
-        <Box sx={{ mr: 2, color: 'primary.main' }}>{icon}</Box>
+        <Box sx={{ mr: 2, color: 'primary.main' }}>
+            {React.cloneElement(icon, { sx: { fontSize: 40, color: 'primary.main' } })}
+        </Box>
         <Box sx={{ flexGrow: 1 }}>
             <Typography color="text.secondary">{title}</Typography>
             <Box sx={{ display: 'flex', alignItems: 'baseline' }}>
@@ -92,10 +90,8 @@ const AdminDashboard = () => {
     const [users, setUsers] = useState([]);
     const [templates, setTemplates] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
     const [modalOpen, setModalOpen] = useState(false);
     const [dialogOpen, setDialogOpen] = useState(false);
-    const [snackbarOpen, setSnackbarOpen] = useState(false);
     const [assignment, setAssignment] = useState({ userId: '', templateId: '' });
     const [tabValue, setTabValue] = useState(0);
     const [searchTerm, setSearchTerm] = useState('');
@@ -107,6 +103,7 @@ const AdminDashboard = () => {
     });
     
     const navigate = useNavigate();
+    const { showNotification } = useNotification();
 
     const fetchData = async () => {
         try {
@@ -137,7 +134,7 @@ const AdminDashboard = () => {
             setChartData(chartsRes.data);
             
         } catch (err) {
-            setError('Failed to load dashboard data.');
+            showNotification('Failed to load dashboard data.', 'error');
             console.error(err);
         } finally {
             setLoading(false);
@@ -148,7 +145,6 @@ const AdminDashboard = () => {
         fetchData();
     }, []);
     
-    // Filter instances when search term or status filter changes
     useEffect(() => {
         let filtered = [...instances];
         
@@ -183,13 +179,12 @@ const AdminDashboard = () => {
         if (assignment.userId && assignment.templateId) {
             handleOpenDialog();
         } else {
-            setError("Please select a user and a template.");
+            showNotification("Please select a user and a template.", 'warning');
         }
     };
 
     const handleAssignOnboarding = async () => {
         handleCloseDialog();
-        setError('');
         try {
             const currentUser = JSON.parse(localStorage.getItem('user'));
             await api.post('/onboarding/instances', {
@@ -198,10 +193,10 @@ const AdminDashboard = () => {
                 assignedBy: currentUser.id
             });
             handleCloseModal();
-            setSnackbarOpen(true);
+            showNotification('Onboarding assigned successfully!', 'success');
             fetchData(); // Refresh data
         } catch (err) {
-            setError('Failed to assign onboarding.');
+            showNotification('Failed to assign onboarding.', 'error');
             console.error(err);
         }
     };
@@ -220,62 +215,58 @@ const AdminDashboard = () => {
 
     return (
         <Container maxWidth="lg">
-            {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-            
-            {/* KPI Cards */}
             <Grid container spacing={3} sx={{ mb: 4 }}>
                 <Grid item xs={12} md={3}>
                     <StatCard 
                         title="Active Onboardings" 
                         value={stats.activeOnboardings} 
-                        icon={<AssignmentIcon color="primary" sx={{ fontSize: 40 }} />} 
+                        icon={<AssignmentIcon />} 
                     />
                 </Grid>
                 <Grid item xs={12} md={3}>
                     <StatCard 
                         title="Total Users" 
                         value={stats.totalUsers} 
-                        icon={<PeopleIcon color="secondary" sx={{ fontSize: 40 }} />} 
+                        icon={<PeopleIcon />} 
                     />
                 </Grid>
                 <Grid item xs={12} md={3}>
                     <StatCard 
                         title="Avg. Onboarding Time" 
                         value={stats.averageCompletionTime} 
-                        icon={<BarChartIcon color="success" sx={{ fontSize: 40 }} />} 
+                        icon={<BarChartIcon />} 
                     />
                 </Grid>
                 <Grid item xs={12} md={3}>
                     <StatCard 
                         title="Completion Rate" 
                         value={`${stats.completionRate}%`} 
-                        icon={<AssignmentIcon color="info" sx={{ fontSize: 40 }} />} 
+                        icon={<AssignmentIcon />} 
                     />
                 </Grid>
                 <Grid item xs={12} md={3}>
                     <StatCard 
                         title="Avg. Task Lead Time" 
                         value={stats.taskLeadTime} 
-                        icon={<TimerIcon sx={{ fontSize: 40 }} />} 
+                        icon={<TimerIcon />} 
                     />
                 </Grid>
                 <Grid item xs={12} md={3}>
                     <StatCard 
                         title="Avg. Ticket Lead Time" 
                         value={stats.ticketLeadTime} 
-                        icon={<ConfirmationNumberIcon color="secondary" sx={{ fontSize: 40 }} />} 
+                        icon={<ConfirmationNumberIcon />} 
                     />
                 </Grid>
             </Grid>
 
             {/* Charts Section */}
-            <Paper sx={{ p: 2, mb: 4, border: 1, borderColor: 'divider', bgcolor: 'background.default' }}>
+            <Paper sx={{ p: 2, mb: 4 }}>
                 <Tabs value={tabValue} onChange={handleTabChange} sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}>
                     <Tab label="Overview" />
                     <Tab label="Task Analysis" />
                 </Tabs>
 
-                {/* Overview Tab */}
                 {tabValue === 0 && (
                     <Grid container spacing={3}>
                         <Grid item xs={12} md={8}>
@@ -288,8 +279,8 @@ const AdminDashboard = () => {
                                         <YAxis />
                                         <RechartsTooltip />
                                         <Legend />
-                                        <Line type="monotone" dataKey="completed" stroke="#8884d8" activeDot={{ r: 8 }} />
-                                        <Line type="monotone" dataKey="started" stroke="#82ca9d" />
+                                        <Line type="monotone" dataKey="completed" stroke="#FA5A50" activeDot={{ r: 8 }} />
+                                        <Line type="monotone" dataKey="started" stroke="#B4DCFA" />
                                     </LineChart>
                                 </ResponsiveContainer>
                             </Box>
@@ -322,7 +313,6 @@ const AdminDashboard = () => {
                     </Grid>
                 )}
 
-                {/* Task Analysis Tab */}
                 {tabValue === 1 && (
                     <Grid container spacing={3}>
                         <Grid item xs={12}>
@@ -335,7 +325,7 @@ const AdminDashboard = () => {
                                         <YAxis />
                                         <RechartsTooltip />
                                         <Legend />
-                                        <Bar dataKey="value" fill="#8884d8" name="Number of Tasks" />
+                                        <Bar dataKey="value" fill="#FA5A50" name="Number of Tasks" />
                                     </BarChart>
                                 </ResponsiveContainer>
                             </Box>
@@ -345,13 +335,12 @@ const AdminDashboard = () => {
             </Paper>
 
             {/* Onboarding Monitor */}
-            <Paper sx={{ p: 2, border: 1, borderColor: 'divider', bgcolor: 'background.default' }}>
+            <Paper sx={{ p: 2}}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                     <Typography variant="h6">Onboarding Monitor</Typography>
                     <Button variant="contained" onClick={handleOpenModal}>Assign Onboarding</Button>
                 </Box>
 
-                {/* Search and Filter */}
                 <Box sx={{ display: 'flex', mb: 2, gap: 2 }}>
                     <TextField
                         variant="outlined"
@@ -437,7 +426,6 @@ const AdminDashboard = () => {
                 </TableContainer>
             </Paper>
 
-            {/* Assign Onboarding Modal */}
             <Modal open={modalOpen} onClose={handleCloseModal}>
                 <Box sx={style} component="form" onSubmit={handleConfirmAssignment}>
                     <Typography variant="h6" component="h2">Assign Onboarding</Typography>
@@ -460,7 +448,6 @@ const AdminDashboard = () => {
                 </Box>
             </Modal>
 
-            {/* Confirm Dialog */}
             <Dialog open={dialogOpen} onClose={handleCloseDialog}>
                 <DialogTitle>Confirm Assignment</DialogTitle>
                 <DialogContent>
@@ -473,13 +460,6 @@ const AdminDashboard = () => {
                     <Button onClick={handleAssignOnboarding} color="primary">Confirm</Button>
                 </DialogActions>
             </Dialog>
-
-            <Snackbar
-                open={snackbarOpen}
-                autoHideDuration={6000}
-                onClose={() => setSnackbarOpen(false)}
-                message="Onboarding assigned successfully!"
-            />
         </Container>
     );
 };

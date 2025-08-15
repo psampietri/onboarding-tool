@@ -3,13 +3,14 @@ import {
     Paper, Box, Typography, Button, TableContainer, Table, TableHead,
     TableRow, TableCell, TableBody, Modal, TextField, List, ListItem,
     ListItemText, Checkbox, Dialog, DialogActions, DialogContent,
-    DialogContentText, DialogTitle, Tooltip, IconButton, CircularProgress, Alert
+    DialogContentText, DialogTitle, Tooltip, IconButton, CircularProgress
 } from '@mui/material';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import api from '../services/api';
+import { useNotification } from '../context/NotificationContext';
 
 const style = {
     position: 'absolute',
@@ -26,12 +27,12 @@ const style = {
 const OnboardingTemplatesTable = ({ taskTemplates }) => {
     const [onboardingTemplates, setOnboardingTemplates] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
     const [modalOpen, setModalOpen] = useState(false);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [currentTemplate, setCurrentTemplate] = useState(null);
     const [selectedTasks, setSelectedTasks] = useState([]);
+    const { showNotification } = useNotification();
 
     const fetchOnboardingTemplates = async () => {
         try {
@@ -39,7 +40,7 @@ const OnboardingTemplatesTable = ({ taskTemplates }) => {
             const response = await api.get('/templates/onboarding');
             setOnboardingTemplates(response.data);
         } catch (err) {
-            setError('Failed to fetch onboarding templates.');
+            showNotification('Failed to fetch onboarding templates.', 'error');
         } finally {
             setLoading(false);
         }
@@ -64,7 +65,7 @@ const OnboardingTemplatesTable = ({ taskTemplates }) => {
             setSelectedTasks(response.data.tasks || []);
             setModalOpen(true);
         } catch (err) {
-            setError('Failed to fetch template details.');
+            showNotification('Failed to fetch template details.', 'error');
         }
     };
 
@@ -89,7 +90,6 @@ const OnboardingTemplatesTable = ({ taskTemplates }) => {
 
     const handleSaveTemplate = async (e) => {
         e.preventDefault();
-        setError('');
         try {
             const currentUser = JSON.parse(localStorage.getItem('user'));
             const payload = {
@@ -102,36 +102,37 @@ const OnboardingTemplatesTable = ({ taskTemplates }) => {
             } else {
                 await api.post('/templates/onboarding', payload);
             }
+            showNotification(`Onboarding template ${isEditing ? 'updated' : 'created'} successfully!`, 'success');
             handleCloseModal();
             fetchOnboardingTemplates();
         } catch (err) {
-            setError('Failed to save onboarding template.');
+            showNotification('Failed to save onboarding template.', 'error');
             console.error(err);
         }
     };
 
     const handleDeleteTemplate = async () => {
-        setError('');
         try {
             await api.delete(`/templates/onboarding/${currentTemplate.id}`);
+            showNotification('Onboarding template deleted successfully!', 'success');
             handleCloseDialog();
             fetchOnboardingTemplates();
         } catch (err) {
-            setError('Failed to delete onboarding template.');
+            showNotification('Failed to delete onboarding template.', 'error');
             console.error(err);
         }
     };
 
     const handleDuplicateTemplate = async (templateId) => {
-        setError('');
         try {
             const currentUser = JSON.parse(localStorage.getItem('user'));
             const response = await api.post(`/templates/onboarding/${templateId}/duplicate`, { created_by: currentUser.id });
             
             setOnboardingTemplates(prev => [...prev, response.data]);
+            showNotification('Onboarding template duplicated successfully!', 'success');
             handleOpenEditModal(response.data);
         } catch (err) {
-            setError('Failed to duplicate onboarding template.');
+            showNotification('Failed to duplicate onboarding template.', 'error');
             console.error(err);
         }
     };
@@ -146,7 +147,6 @@ const OnboardingTemplatesTable = ({ taskTemplates }) => {
                     Create Onboarding Template
                 </Button>
             </Box>
-            {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
             <TableContainer>
                 <Table size="small">
                     <TableHead>

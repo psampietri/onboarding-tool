@@ -1,19 +1,18 @@
-// frontend/src/pages/admin/EmailTemplates.jsx
 import React, { useState, useEffect } from 'react';
 import {
     Container, Typography, Paper, Button, Table, TableBody, TableCell, TableContainer,
     TableHead, TableRow, IconButton, Dialog, DialogActions, DialogContent, DialogTitle,
-    TextField, Grid, Box, Alert, CircularProgress, Tooltip
+    TextField, Grid, Box, CircularProgress, Tooltip
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import api from '../../services/api';
+import { useNotification } from '../../context/NotificationContext';
 
 const EmailTemplates = () => {
     const [templates, setTemplates] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
     const [dialogOpen, setDialogOpen] = useState(false);
     const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -24,16 +23,16 @@ const EmailTemplates = () => {
         body_template: ''
     });
     const [previewHtml, setPreviewHtml] = useState('');
+    const { showNotification } = useNotification();
     
     const fetchTemplates = async () => {
         try {
             setLoading(true);
             const response = await api.get('/notifications/email/templates');
             setTemplates(response.data);
-            setError('');
         } catch (error) {
             console.error('Error fetching email templates:', error);
-            setError('Failed to load email templates');
+            showNotification('Failed to load email templates', 'error');
         } finally {
             setLoading(false);
         }
@@ -92,7 +91,7 @@ const EmailTemplates = () => {
     const handleSubmit = async () => {
         try {
             if (!currentTemplate.name || !currentTemplate.subject || !currentTemplate.body_template) {
-                setError('All fields are required');
+                showNotification('All fields are required', 'warning');
                 return;
             }
             
@@ -105,6 +104,7 @@ const EmailTemplates = () => {
                     subject: currentTemplate.subject,
                     bodyTemplate: currentTemplate.body_template
                 });
+                showNotification('Template updated successfully!', 'success');
             } else {
                 // Create new template
                 await api.post('/notifications/email/templates', {
@@ -113,24 +113,26 @@ const EmailTemplates = () => {
                     bodyTemplate: currentTemplate.body_template,
                     createdBy: user.id
                 });
+                showNotification('Template created successfully!', 'success');
             }
             
             setDialogOpen(false);
             fetchTemplates();
         } catch (error) {
             console.error('Error saving template:', error);
-            setError('Failed to save template');
+            showNotification('Failed to save template', 'error');
         }
     };
     
     const handleConfirmDelete = async () => {
         try {
             await api.delete(`/notifications/email/templates/${currentTemplate.id}`);
+            showNotification('Template deleted successfully!', 'success');
             setDeleteDialogOpen(false);
             fetchTemplates();
         } catch (error) {
             console.error('Error deleting template:', error);
-            setError('Failed to delete template');
+            showNotification('Failed to delete template', 'error');
         }
     };
     
@@ -150,8 +152,6 @@ const EmailTemplates = () => {
                     Create Template
                 </Button>
             </Box>
-            
-            {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
             
             <Paper>
                 <TableContainer>

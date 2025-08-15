@@ -1,16 +1,8 @@
 import pg from 'pg';
 import 'dotenv/config';
+import logger from '../utils/logger.js';
 
 const { Pool } = pg;
-
-console.log('Initializing database pool with the following config:');
-console.log({
-    user: process.env.DB_USER,
-    host: process.env.DB_HOST,
-    database: process.env.DB_DATABASE,
-    password: '***', // For security, we do not log the password
-    port: process.env.DB_PORT,
-});
 
 const pool = new Pool({
     user: process.env.DB_USER,
@@ -22,11 +14,18 @@ const pool = new Pool({
     idleTimeoutMillis: 5000,
 });
 
-pool.on('error', (err, client) => {
-    console.error('DATABASE POOL ERROR:', err);
-    // process.exit(-1); // This is too aggressive and can crash the service
+pool.on('connect', client => {
+    logger.info('Database client connected.');
 });
 
-console.log('Database pool created.');
+pool.on('error', (err, client) => {
+    logger.error({ err }, 'DATABASE POOL ERROR:');
+});
+
+pool.on('remove', client => {
+    logger.info('Database client removed.');
+});
+
+logger.info('Database pool created.');
 
 export default pool;

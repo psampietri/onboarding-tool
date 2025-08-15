@@ -12,28 +12,31 @@ import ManageTemplates from './pages/admin/ManageTemplates';
 import OnboardingInstanceDetail from './pages/admin/OnboardingInstanceDetail';
 import EmailTemplates from './pages/admin/EmailTemplates';
 import AuditLogs from './pages/admin/AuditLogs'; // Import the new page
+import { NotificationProvider } from './context/NotificationContext';
 
 const App = () => {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        
-        <Route path="/admin" element={<AdminLayout />}>
-          <Route index element={<Navigate to="dashboard" />} />
-          <Route path="dashboard" element={<AdminDashboard />} />
-          <Route path="users" element={<ManageUsers />} />
-          <Route path="templates" element={<ManageTemplates />} />
-          <Route path="onboarding/:instanceId" element={<OnboardingInstanceDetail />} />
-          <Route path="email-templates" element={<EmailTemplates />} />
-          <Route path="audit-logs" element={<AuditLogs />} /> {/* Add the new route */}
-        </Route>
+      <NotificationProvider>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          
+          <Route path="/admin" element={<AdminLayout />}>
+            <Route index element={<Navigate to="dashboard" />} />
+            <Route path="dashboard" element={<AdminDashboard />} />
+            <Route path="users" element={<ManageUsers />} />
+            <Route path="templates" element={<ManageTemplates />} />
+            <Route path="onboarding/:instanceId" element={<OnboardingInstanceDetail />} />
+            <Route path="email-templates" element={<EmailTemplates />} />
+            <Route path="audit-logs" element={<AuditLogs />} /> {/* Add the new route */}
+          </Route>
 
-        <Route path="/" element={<UserLayout />}>
-          <Route index element={<UserDashboard />} />
-        </Route>
-      </Routes>
+          <Route path="/" element={<UserLayout />}>
+            <Route index element={<UserDashboard />} />
+          </Route>
+        </Routes>
+      </NotificationProvider>
     </ThemeProvider>
   );
 }

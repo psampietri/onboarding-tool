@@ -31,9 +31,9 @@ const OnboardingTaskItem = ({
 
     const getStatusIcon = (status) => {
         switch (status) {
-            case 'completed': return <CheckCircleIcon color="success" />;
-            case 'in_progress': return <AccessTimeIcon color="warning" />;
-            case 'blocked': return <ErrorIcon color="error" />;
+            case 'completed': return <CheckCircleIcon color="primary" />;
+            case 'in_progress': return <AccessTimeIcon color="primary" />;
+            case 'blocked': return <ErrorIcon color="primary" />;
             default: return <HourglassEmptyIcon color="disabled" />;
         }
     };
@@ -57,7 +57,7 @@ const OnboardingTaskItem = ({
                         </Box>
                         {node.instructions && (
                             <Tooltip title={node.instructions}>
-                                <IconButton size="small" sx={{ ml: 1 }}><InfoOutlinedIcon fontSize="small" /></IconButton>
+                                <IconButton size="small" sx={{ ml: 1 }}><InfoOutlinedIcon fontSize="small" color="primary" /></IconButton>
                             </Tooltip>
                         )}
                     </Box>
@@ -81,15 +81,15 @@ const OnboardingTaskItem = ({
 
                         {isBlocked && (
                             <Tooltip title={`Blocked by: ${blockers.join(', ')}`}>
-                                <IconButton><LockIcon /></IconButton>
+                                <IconButton><LockIcon color="primary" /></IconButton>
                             </Tooltip>
                         )}
                         <Tooltip title="View/Edit Ticket">
-                            <IconButton onClick={() => handleOpenTicketModal(node)}><ConfirmationNumberIcon /></IconButton>
+                            <IconButton onClick={() => handleOpenTicketModal(node)}><ConfirmationNumberIcon color="primary" /></IconButton>
                         </Tooltip>
                         {node.ticket_info?.key && (
                             <Tooltip title="Unassign Ticket">
-                                <IconButton onClick={() => handleUnassignTicket(node.id)}><LinkOffIcon /></IconButton>
+                                <IconButton onClick={() => handleUnassignTicket(node.id)}><LinkOffIcon color="primary" /></IconButton>
                             </Tooltip>
                         )}
                         {node.task_type === 'automated_access_request' && node.status === 'not_started' && !isBlocked && (

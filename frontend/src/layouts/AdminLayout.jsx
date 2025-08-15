@@ -1,9 +1,8 @@
-// frontend/src/layouts/AdminLayout.jsx
 import React, { useState } from 'react';
 import { Outlet, Link as RouterLink, useLocation, useNavigate } from 'react-router-dom';
 import { 
     Box, AppBar, Toolbar, Typography, IconButton, Menu, MenuItem, Avatar, Divider,
-    Tabs, Tab, Container, ListItemIcon, ListItemText // Correctly imported here
+    Tabs, Tab, Container, ListItemIcon, ListItemText
 } from '@mui/material';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import PeopleIcon from '@mui/icons-material/People';
@@ -11,14 +10,15 @@ import AssignmentIcon from '@mui/icons-material/Assignment';
 import ExitToAppIcon from '@mui/icons-material/ExitToApp';
 import EmailIcon from '@mui/icons-material/Email';
 import HistoryIcon from '@mui/icons-material/History';
+import PaletteIcon from '@mui/icons-material/Palette';
 import NotificationCenter from '../components/NotificationCenter';
 
 const navItems = [
-    { text: 'Dashboard', icon: <DashboardIcon />, path: '/admin/dashboard' },
-    { text: 'Manage Users', icon: <PeopleIcon />, path: '/admin/users' },
-    { text: 'Manage Templates', icon: <AssignmentIcon />, path: '/admin/templates' },
-    { text: 'Email Templates', icon: <EmailIcon />, path: '/admin/email-templates' },
-    { text: 'Audit Logs', icon: <HistoryIcon />, path: '/admin/audit-logs' },
+    { text: 'Dashboard', icon: <DashboardIcon color="primary" />, path: '/admin/dashboard' },
+    { text: 'Manage Users', icon: <PeopleIcon color="primary" />, path: '/admin/users' },
+    { text: 'Manage Templates', icon: <AssignmentIcon color="primary" />, path: '/admin/templates' },
+    { text: 'Email Templates', icon: <EmailIcon color="primary" />, path: '/admin/email-templates' },
+    { text: 'Audit Logs', icon: <HistoryIcon color="primary" />, path: '/admin/audit-logs' },
 ];
 
 const AdminLayout = () => {
@@ -61,7 +61,7 @@ const AdminLayout = () => {
                             onClick={handleMenu}
                             color="inherit"
                         >
-                            <Avatar sx={{ width: 32, height: 32, bgcolor: 'secondary.main' }}>
+                            <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main' }}>
                                 {user.name ? user.name[0].toUpperCase() : 'U'}
                             </Avatar>
                         </IconButton>
@@ -91,7 +91,7 @@ const AdminLayout = () => {
                             <Divider />
                             <MenuItem onClick={handleLogout}>
                                 <ListItemIcon>
-                                    <ExitToAppIcon fontSize="small" />
+                                    <ExitToAppIcon fontSize="small" color="primary" />
                                 </ListItemIcon>
                                 <ListItemText>Logout</ListItemText>
                             </MenuItem>
@@ -113,7 +113,7 @@ const AdminLayout = () => {
                     <Tabs 
                         value={currentTab === -1 ? false : currentTab} 
                         indicatorColor="primary"
-                        textColor="inherit"
+                        textColor="primary"
                     >
                         {navItems.map((item, index) => (
                             <Tab 

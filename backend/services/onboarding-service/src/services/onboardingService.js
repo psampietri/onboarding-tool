@@ -1,6 +1,7 @@
 import axios from 'axios';
 import * as OnboardingModel from '../models/onboardingModel.js';
 import * as UserService from '../../../user-service/src/services/userService.js';
+import logger from '../../../../utils/logger.js';
 
 // This service now communicates with the integration service via HTTP.
 const integrationServiceApi = axios.create({
@@ -8,7 +9,9 @@ const integrationServiceApi = axios.create({
 });
 
 export const createOnboardingInstance = async (instanceData) => {
-    return await OnboardingModel.createOnboardingInstance(instanceData.userId, instanceData.templateId, instanceData.assignedBy);
+    const instance = await OnboardingModel.createOnboardingInstance(instanceData.userId, instanceData.templateId, instanceData.assignedBy);
+    logger.info({ instanceId: instance.id, userId: instanceData.userId }, "New onboarding instance created.");
+    return instance;
 };
 
 export const getAllOnboardingInstances = async () => {
@@ -50,12 +53,15 @@ export const updateTaskStatus = async (taskId, { status, ticketInfo, ticket_crea
         fieldsToUpdate.task_completed_at = new Date().toISOString();
     }
     
+    logger.info({ taskId, newStatus: status }, "Updating task status.");
     return await OnboardingModel.updateTaskInstance(taskId, fieldsToUpdate);
 };
 
 export const executeAutomatedTask = async (taskId) => {
+    logger.info({ taskId }, "Attempting to execute automated task.");
     const task = await OnboardingModel.findTaskInstanceById(taskId);
     if (!task || task.task_type !== 'automated_access_request') {
+        logger.warn({ taskId }, "Execution failed: Task is not an automated access request.");
         throw new Error('Task is not an automated access request.');
     }
 
@@ -68,6 +74,7 @@ export const executeAutomatedTask = async (taskId) => {
             user: user
         });
         const result = response.data;
+        logger.info({ taskId, ticketKey: result.issueKey }, "Successfully created ticket for automated task.");
         
         // After successful ticket creation, update the task status to 'in progress'
         // and save the ticket information.
@@ -80,14 +87,13 @@ export const executeAutomatedTask = async (taskId) => {
         };
         return await OnboardingModel.updateTaskInstance(taskId, fieldsToUpdate);
     } catch (error) {
-        console.error("Error calling integration service to create ticket:", error.response ? error.response.data : error.message);
-        // If the ticket creation fails, we should not leave the task in a broken state.
-        // Revert any changes or simply throw a more specific error.
+        logger.error({ err: error, taskId }, "Error executing automated task.");
         throw new Error('Failed to create Jira ticket. Please check the integration service logs for details.');
     }
 };
 
 export const dryRunAutomatedTask = async (taskId) => {
+    logger.info({ taskId }, "Performing dry run for automated task.");
     const task = await OnboardingModel.findTaskInstanceById(taskId);
     if (!task || task.task_type !== 'automated_access_request') {
         throw new Error('Task is not an automated access request.');
@@ -105,14 +111,17 @@ export const dryRunAutomatedTask = async (taskId) => {
 };
 
 export const updateOnboardingInstance = async (instanceId, data) => {
+    logger.info({ instanceId, newStatus: data.status }, "Updating onboarding instance status.");
     return await OnboardingModel.updateOnboardingInstance(instanceId, data);
 };
 
 export const deleteOnboardingInstance = async (instanceId) => {
+    logger.warn({ instanceId }, "Deleting onboarding instance.");
     return await OnboardingModel.deleteOnboardingInstance(instanceId);
 };
 
 export const unassignTicket = async (taskId) => {
+    logger.info({ taskId }, "Unassigning ticket from task.");
     const fieldsToUpdate = {
         status: 'not_started',
         ticket_info: null,

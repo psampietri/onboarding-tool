@@ -3,7 +3,7 @@ import {
     Container, Typography, Paper, Table, TableBody, TableCell, TableContainer,
     TableHead, TableRow, TextField, Box, Grid, IconButton, Button,
     FormControl, InputLabel, Select, MenuItem, Tooltip, CircularProgress,
-    Alert, Collapse, Card, CardContent
+    Collapse, Card, CardContent
 } from '@mui/material';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import RefreshIcon from '@mui/icons-material/Refresh';
@@ -14,11 +14,11 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFnsV3';
 import { format } from 'date-fns';
 import auditService from '../../services/auditService';
+import { useNotification } from '../../context/NotificationContext';
 
 const AuditLogs = () => {
     const [logs, setLogs] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
     const [filters, setFilters] = useState({
         userId: '',
         action: '',
@@ -29,11 +29,11 @@ const AuditLogs = () => {
     });
     const [selectedLog, setSelectedLog] = useState(null);
     const [showFilters, setShowFilters] = useState(false);
+    const { showNotification } = useNotification();
     
     const fetchLogs = async () => {
         try {
             setLoading(true);
-            setError('');
             
             // Prepare filters
             const apiFilters = { ...filters };
@@ -48,7 +48,7 @@ const AuditLogs = () => {
             setLogs(data);
         } catch (err) {
             console.error('Error fetching audit logs:', err);
-            setError('Failed to load audit logs');
+            showNotification('Failed to load audit logs', 'error');
         } finally {
             setLoading(false);
         }
@@ -144,8 +144,6 @@ const AuditLogs = () => {
                     </Tooltip>
                 </Box>
             </Box>
-            
-            {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
             
             <Collapse in={showFilters}>
                 <Paper sx={{ p: 2, mb: 3 }}>

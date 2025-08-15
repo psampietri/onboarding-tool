@@ -8,6 +8,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers';
 import api from '../../services/api';
 import { executeAutomatedTask, dryRunAutomatedTask, updateOnboardingInstance, deleteOnboardingInstance, updateTaskStatus, unassignTicket } from '../../services/onboardingService';
 import { getTicketDetails } from '../../services/integrationService';
+import { useNotification } from '../../context/NotificationContext';
 
 import OnboardingInstanceHeader from '../../components/OnboardingInstanceHeader';
 import OnboardingTaskTree from '../../components/OnboardingTaskTree';
@@ -30,7 +31,6 @@ const OnboardingInstanceDetail = () => {
     const navigate = useNavigate();
     const [instance, setInstance] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
     const [taskLoading, setTaskLoading] = useState(null);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [dryRunModalOpen, setDryRunModalOpen] = useState(false);
@@ -48,6 +48,7 @@ const OnboardingInstanceDetail = () => {
     const [taskSearchTerm, setTaskSearchTerm] = useState('');
     const [taskStatusFilter, setTaskStatusFilter] = useState('all');
     const scrollPositionRef = useRef(0);
+    const { showNotification } = useNotification();
 
     const fetchInstanceDetails = async () => {
         if (instance) {
@@ -59,7 +60,7 @@ const OnboardingInstanceDetail = () => {
             const response = await api.get(`/onboarding/instances/${instanceId}`);
             setInstance(response.data);
         } catch (err) {
-            setError('Failed to fetch onboarding instance details.');
+            showNotification('Failed to fetch onboarding instance details.', 'error');
             console.error(err);
         } finally {
             setLoading(false);
@@ -151,7 +152,7 @@ const OnboardingInstanceDetail = () => {
             const task = instance.tasks.find(t => t.id === taskId);
             if (!task) {
                 console.error("Task not found:", taskId);
-                setError("An error occurred while updating the task.");
+                showNotification("An error occurred while updating the task.", 'error');
                 return;
             }
 
@@ -163,9 +164,10 @@ const OnboardingInstanceDetail = () => {
                 task.ticket_created_at, 
                 task.ticket_closed_at
             );
+            showNotification('Task status updated successfully!', 'success');
             fetchInstanceDetails();
         } catch (err) {
-            setError('Failed to update task status.');
+            showNotification('Failed to update task status.', 'error');
             console.error(err);
         }
     };
@@ -175,20 +177,21 @@ const OnboardingInstanceDetail = () => {
         try {
             await updateOnboardingInstance(instanceId, { status: newStatus });
             setInstance(prev => ({ ...prev, status: newStatus }));
+            showNotification('Instance status updated successfully!', 'success');
         } catch (err) {
-            setError('Failed to update instance status.');
+            showNotification('Failed to update instance status.', 'error');
             console.error(err);
         }
     };
 
     const handleExecuteTask = async (taskId) => {
         setTaskLoading(taskId);
-        setError('');
         try {
             await executeAutomatedTask(taskId);
+            showNotification('Automated task executed successfully!', 'success');
             fetchInstanceDetails();
         } catch (err) {
-            setError('Failed to execute automated task.');
+            showNotification('Failed to execute automated task.', 'error');
             console.error(err);
         } finally {
             setTaskLoading(null);
@@ -197,13 +200,12 @@ const OnboardingInstanceDetail = () => {
 
     const handleDryRun = async (taskId) => {
         setTaskLoading(taskId);
-        setError('');
         try {
             const result = await dryRunAutomatedTask(taskId);
             setDryRunResult(result);
             setDryRunModalOpen(true);
         } catch (err) {
-            setError('Failed to perform dry run.');
+            showNotification('Failed to perform dry run.', 'error');
             console.error(err);
         } finally {
             setTaskLoading(null);
@@ -221,9 +223,10 @@ const OnboardingInstanceDetail = () => {
     const handleDelete = async () => {
         try {
             await deleteOnboardingInstance(instanceId);
+            showNotification('Onboarding instance deleted successfully!', 'success');
             navigate('/admin/dashboard');
         } catch (err) {
-            setError('Failed to delete onboarding instance.');
+            showNotification('Failed to delete onboarding instance.', 'error');
             console.error(err);
         }
     };
@@ -232,9 +235,10 @@ const OnboardingInstanceDetail = () => {
         if (window.confirm('Are you sure you want to unassign this ticket? The task status will be reset.')) {
             try {
                 await unassignTicket(taskId);
+                showNotification("Ticket unassigned successfully.", 'success');
                 fetchInstanceDetails();
             } catch (err) {
-                setError("Failed to unassign ticket.");
+                showNotification("Failed to unassign ticket.", 'error');
                 console.error("Unassign ticket error:", err);
             }
         }
@@ -283,7 +287,7 @@ const OnboardingInstanceDetail = () => {
                 setLiveTicketDetails(details);
             } catch (err) {
                 console.error("Failed to fetch live ticket details", err);
-                setError("Failed to fetch live ticket details from Jira.");
+                showNotification("Failed to fetch live ticket details from Jira.", 'error');
             } finally {
                 setTicketDetailsLoading(false);
             }
@@ -304,21 +308,23 @@ const OnboardingInstanceDetail = () => {
                 ticket_created_at, 
                 ticket_closed_at
             );
+            showNotification('Ticket information saved successfully!', 'success');
             fetchInstanceDetails();
             setTicketModalOpen(false);
         } catch (err) {
             console.error("Failed to save ticket info:", err);
-            setError("Failed to save ticket information.");
+            showNotification("Failed to save ticket information.", 'error');
         }
     };
 
     const handleRemoveTicketInfo = async () => {
         try {
             await updateTaskStatus(selectedTaskForTicket.id, selectedTaskForTicket.status, null);
+            showNotification('Ticket information removed.', 'success');
             fetchInstanceDetails();
             setTicketModalOpen(false);
         } catch (err) {
-            setError("Failed to remove ticket information.");
+            showNotification("Failed to remove ticket information.", 'error');
         }
     };
 
@@ -342,12 +348,8 @@ const OnboardingInstanceDetail = () => {
         return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}><CircularProgress /></Box>;
     }
 
-    if (error && !instance) { // Only show full-page error if instance fails to load
-        return <Alert severity="error">{error}</Alert>;
-    }
-
     if (!instance) {
-        return <Typography>Onboarding instance not found.</Typography>;
+        return <Alert severity="error">Onboarding instance not found.</Alert>;
     }
 
     return (
@@ -360,7 +362,6 @@ const OnboardingInstanceDetail = () => {
                     blockedTasks={blockedTasks}
                     onStatusChange={handleInstanceStatusChange}
                     onDelete={handleOpenDeleteDialog}
-                    error={error}
                 />
                 
                 <OnboardingTaskTree

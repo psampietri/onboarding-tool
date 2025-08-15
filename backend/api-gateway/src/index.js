@@ -3,17 +3,15 @@ import cors from 'cors';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import jwt from 'jsonwebtoken';
 import 'dotenv/config';
+import pinoHttp from 'pino-http';
+import logger from '../../utils/logger.js';
 
 const app = express();
 const PORT = process.env.PORT || 5010;
 const SECRET_KEY = process.env.SECRET_KEY;
+const httpLogger = pinoHttp({ logger });
 
-// Middleware to log all incoming requests immediately
-app.use((req, res, next) => {
-    console.log(`[API Gateway] INCOMING: ${req.method} ${req.originalUrl} from ${req.headers.origin}`);
-    next();
-});
-
+app.use(httpLogger);
 app.use(cors());
 
 const services = {
@@ -28,15 +26,15 @@ const services = {
 // Enhanced Proxy Logging Handlers
 const onProxyReq = (proxyReq, req, res) => {
     const targetService = services[req.context.serviceName];
-    console.log(`[API Gateway] PROXYING: ${req.method} ${req.originalUrl} -> ${targetService}${proxyReq.path}`);
+    req.log.info(`[API Gateway] PROXYING: ${req.method} ${req.originalUrl} -> ${targetService}${proxyReq.path}`);
 };
 
 const onProxyRes = (proxyRes, req, res) => {
-    console.log(`[API Gateway] RESPONSE from ${services[req.context.serviceName]} for ${req.originalUrl} -> STATUS: ${proxyRes.statusCode}`);
+    req.log.info(`[API Gateway] RESPONSE from ${services[req.context.serviceName]} for ${req.originalUrl} -> STATUS: ${proxyRes.statusCode}`);
 };
 
 const onError = (err, req, res) => {
-    console.error(`[API Gateway] PROXY ERROR for ${req.originalUrl}:`, err);
+    req.log.error({ err }, `[API Gateway] PROXY ERROR for ${req.originalUrl}`);
     if (!res.headersSent) {
         res.status(504).send('Proxy Timeout or Error');
     }
@@ -63,7 +61,7 @@ const authenticateToken = (req, res, next) => {
 
     jwt.verify(token, SECRET_KEY, (err, user) => {
         if (err) {
-            console.error("JWT Verification Error:", err.message);
+            req.log.error({ err }, "JWT Verification Error:");
             return res.sendStatus(403);
         }
         req.user = user;
@@ -82,5 +80,5 @@ app.use('/api/notifications', authenticateToken, setServiceContext('notification
 app.use('/api/audit', authenticateToken, setServiceContext('analytics'), createProxyMiddleware({ ...commonProxyOptions, target: services.analytics, pathRewrite: { '^/api/audit': '' } }));
 
 app.listen(PORT, () => {
-    console.log(`API Gateway listening on port ${PORT}`);
+    logger.info(`API Gateway listening on port ${PORT}`);
 });

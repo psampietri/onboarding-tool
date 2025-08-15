@@ -1,28 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import {
     Container, Typography, Card, CardContent, List, ListItem, ListItemText,
-    Checkbox, CircularProgress, Box, Alert
+    Checkbox, CircularProgress, Box
 } from '@mui/material';
 import { getOnboardingStatusForUser, updateTaskStatus } from '../../services/onboardingService';
+import { useNotification } from '../../context/NotificationContext';
 
 const UserDashboard = () => {
     const [tasks, setTasks] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
+    const { showNotification } = useNotification();
 
     useEffect(() => {
         const fetchTasks = async () => {
             try {
                 const currentUser = JSON.parse(localStorage.getItem('user'));
                 if (!currentUser) {
-                    setError('User not found. Please log in again.');
+                    showNotification('User not found. Please log in again.', 'error');
                     setLoading(false);
                     return;
                 }
                 const userTasks = await getOnboardingStatusForUser(currentUser.id);
                 setTasks(userTasks);
             } catch (err) {
-                setError('Failed to load onboarding tasks.');
+                showNotification('Failed to load onboarding tasks.', 'error');
                 console.error(err);
             } finally {
                 setLoading(false);
@@ -38,9 +39,10 @@ const UserDashboard = () => {
             setTasks(tasks.map(task =>
                 task.id === taskId ? { ...task, status: newStatus } : task
             ));
+            showNotification('Task status updated!', 'success');
         } catch (err) {
             console.error('Failed to update task status:', err);
-            setError('Could not update task status.');
+            showNotification('Could not update task status.', 'error');
         }
     };
 
@@ -53,7 +55,6 @@ const UserDashboard = () => {
             <Typography variant="h4" gutterBottom>
                 Your Onboarding Progress
             </Typography>
-            {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
             <Card>
                 <CardContent>
                     {tasks.length > 0 ? (

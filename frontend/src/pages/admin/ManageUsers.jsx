@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
     Container, Typography, Paper, TableContainer, Table, TableHead,
-    TableRow, TableCell, TableBody, CircularProgress, Box, Alert, Button,
+    TableRow, TableCell, TableBody, CircularProgress, Box, Button,
     Modal, TextField, FormControl, InputLabel, Select, MenuItem, IconButton,
     Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle
 } from '@mui/material';
@@ -9,6 +9,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import useUserManagement from '../../hooks/useUserManagement';
 import ManageFieldsModal from '../../components/ManageFieldsModal';
+import { useNotification } from '../../context/NotificationContext';
 
 const style = {
     position: 'absolute',
@@ -39,6 +40,7 @@ const ManageUsers = () => {
     const [newOwnerId, setNewOwnerId] = useState('');
     
     const [fieldsModalOpen, setFieldsModalOpen] = useState(false);
+    const { showNotification } = useNotification();
 
     const handleOpenCreateModal = () => {
         setIsEditing(false);
@@ -72,33 +74,38 @@ const ManageUsers = () => {
 
     const handleSaveUser = async (e) => {
         e.preventDefault();
-        setError('');
         try {
             await saveUser(currentUser, isEditing);
+            showNotification(`User ${isEditing ? 'updated' : 'created'} successfully!`, 'success');
             handleCloseModal();
         } catch (err) {
-            setError(`Failed to ${isEditing ? 'update' : 'create'} user.`);
+            const errorMessage = err.response?.data?.error || `Failed to ${isEditing ? 'update' : 'create'} user.`;
+            showNotification(errorMessage, 'error');
             console.error('Save user error:', err);
         }
     };
 
     const handleDeleteUser = async () => {
-        setError('');
         if (!newOwnerId) {
-            setError('You must select a new owner for the assets.');
+            showNotification('You must select a new owner for the assets.', 'warning');
             return;
         }
         try {
             await deleteUserById(userToDelete.id, newOwnerId);
+            showNotification('User deleted successfully!', 'success');
             handleCloseDialog();
         } catch (err) {
-            setError('Failed to delete user.');
+            showNotification('Failed to delete user.', 'error');
             console.error('Delete user error:', err);
         }
     };
 
     if (loading) {
         return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}><CircularProgress /></Box>;
+    }
+
+    if (error) {
+        showNotification(error, 'error');
     }
 
     return (
@@ -112,8 +119,6 @@ const ManageUsers = () => {
                     <Button variant="contained" onClick={handleOpenCreateModal}>Add User</Button>
                 </Box>
             </Box>
-
-            {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
             <TableContainer component={Paper}>
                 <Table sx={{ minWidth: 650 }}>
