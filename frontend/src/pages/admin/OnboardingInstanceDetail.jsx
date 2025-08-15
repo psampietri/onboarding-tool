@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     Container, Typography, Paper, Box, CircularProgress, Alert,
-    Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Chip,
     FormControl, Select, MenuItem, Button, Tooltip, Grid, Card, CardContent,
-    LinearProgress, Stack, Divider, List, ListItem, ListItemText, ListItemIcon,
-    Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, InputLabel, Modal, Link, TextField
+    LinearProgress, Divider, List, ListItem, ListItemText,
+    Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, InputLabel, Modal, Link, TextField, Chip, InputAdornment
 } from '@mui/material';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFnsV3';
 import { LocalizationProvider, DateTimePicker } from '@mui/x-date-pickers';
@@ -17,11 +16,14 @@ import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import IconButton from '@mui/material/IconButton';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import ConfirmationNumberIcon from '@mui/icons-material/ConfirmationNumber';
+import LinkOffIcon from '@mui/icons-material/LinkOff';
+import SearchIcon from '@mui/icons-material/Search';
+import FilterListIcon from '@mui/icons-material/FilterList';
 import { SimpleTreeView, TreeItem } from '@mui/x-tree-view';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import api from '../../services/api';
-import { executeAutomatedTask, dryRunAutomatedTask, updateOnboardingInstance, deleteOnboardingInstance, updateTaskStatus } from '../../services/onboardingService';
+import { executeAutomatedTask, dryRunAutomatedTask, updateOnboardingInstance, deleteOnboardingInstance, updateTaskStatus, unassignTicket } from '../../services/onboardingService';
 import { getTicketDetails } from '../../services/integrationService';
 
 const style = {
@@ -36,6 +38,15 @@ const style = {
     p: 4,
 };
 
+// Custom hook to get the previous value of a prop or state.
+function usePrevious(value) {
+  const ref = useRef();
+  useEffect(() => {
+    ref.current = value;
+  });
+  return ref.current;
+}
+
 const OnboardingInstanceDetail = () => {
     const { instanceId } = useParams();
     const navigate = useNavigate();
@@ -43,7 +54,6 @@ const OnboardingInstanceDetail = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [taskLoading, setTaskLoading] = useState(null);
-    const [activeTab, setActiveTab] = useState('table');
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [dryRunModalOpen, setDryRunModalOpen] = useState(false);
     const [dryRunResult, setDryRunResult] = useState(null);
@@ -56,10 +66,18 @@ const OnboardingInstanceDetail = () => {
     const [isManualTicketEntry, setIsManualTicketEntry] = useState(false);
     const [manualTicketCreatedDate, setManualTicketCreatedDate] = useState(null);
     const [manualTicketClosedDate, setManualTicketClosedDate] = useState(null);
+    const [expandedNodes, setExpandedNodes] = useState([]);
+    const [taskSearchTerm, setTaskSearchTerm] = useState('');
+    const [taskStatusFilter, setTaskStatusFilter] = useState('all');
+    const scrollPositionRef = useRef(0);
 
     const fetchInstanceDetails = async () => {
+        if (instance) {
+            scrollPositionRef.current = window.scrollY;
+        }
         try {
-            setLoading(true);
+            // No need to set loading to true on refresh, avoids flickering
+            if (!instance) setLoading(true);
             const response = await api.get(`/onboarding/instances/${instanceId}`);
             setInstance(response.data);
         } catch (err) {
@@ -74,65 +92,99 @@ const OnboardingInstanceDetail = () => {
         fetchInstanceDetails();
     }, [instanceId]);
 
+    useLayoutEffect(() => {
+        if (scrollPositionRef.current > 0) {
+            window.scrollTo(0, scrollPositionRef.current);
+        }
+    }, [instance]);
+
     useEffect(() => {
         if (instance?.tasks) {
             const tasks = instance.tasks;
-            // Create maps for efficient lookups
-            const taskMap = new Map(tasks.map(task => [task.id, { ...task, children: [] }]));
-            const templateIdToTaskIdMap = new Map(tasks.map(task => [task.task_template_id, task.id]));
+            const nodes = new Map(tasks.map(task => [task.id, { ...task, children: [] }]));
+            const templateIdToTaskId = new Map(tasks.map(task => [task.task_template_id, task.id]));
             
-            const childIds = new Set();
+            const assignedChildren = new Set();
 
-            // Build the full dependency graph (a DAG)
-            for (const task of taskMap.values()) {
+            tasks.forEach(task => {
                 if (task.dependencies && task.dependencies.length > 0) {
                     for (const depTemplateId of task.dependencies) {
-                        const parentTaskId = templateIdToTaskIdMap.get(depTemplateId);
-                        if (parentTaskId) {
-                            const parentNode = taskMap.get(parentTaskId);
-                            if (parentNode) {
-                                parentNode.children.push(task);
-                                childIds.add(task.id);
+                        if (assignedChildren.has(task.id)) break;
+
+                        const parentId = templateIdToTaskId.get(depTemplateId);
+                        if (parentId) {
+                            const parentNode = nodes.get(parentId);
+                            const childNode = nodes.get(task.id);
+                            if (parentNode && childNode) {
+                                parentNode.children.push(childNode);
+                                assignedChildren.add(childNode.id);
                             }
                         }
                     }
                 }
-            }
+            });
 
-            // Identify the root nodes of the graph
-            const rootNodes = [];
-            for (const task of taskMap.values()) {
-                if (!childIds.has(task.id)) {
-                    rootNodes.push(task);
-                }
-            }
-
-            // Traverse the graph and build a new tree structure, ensuring each node is only visited and added once.
-            // This converts the DAG into a tree that can be safely rendered.
-            const visited = new Set();
-            function buildUniqueTree(nodes) {
-                const result = [];
-                for (const node of nodes) {
-                    if (!visited.has(node.id)) {
-                        visited.add(node.id);
-                        const newNode = { ...node };
-                        if (node.children.length > 0) {
-                            newNode.children = buildUniqueTree(node.children);
-                        }
-                        result.push(newNode);
-                    }
-                }
-                return result;
-            }
-
-            const finalTree = buildUniqueTree(rootNodes);
-            setTaskTree(finalTree);
+            const rootNodes = Array.from(nodes.values()).filter(node => !assignedChildren.has(node.id));
+            setTaskTree(rootNodes);
         }
     }, [instance]);
 
+    const filteredTaskTree = useMemo(() => {
+        if (!taskSearchTerm && taskStatusFilter === 'all') {
+            return { tree: taskTree, expandedIds: [] };
+        }
+
+        const expandedIds = new Set();
+        const filterNodes = (nodes) => {
+            const result = [];
+            for (const node of nodes) {
+                const filteredChildren = node.children ? filterNodes(node.children) : [];
+                
+                const nameMatch = node.name.toLowerCase().includes(taskSearchTerm.toLowerCase());
+                const statusMatch = taskStatusFilter === 'all' || node.status === taskStatusFilter;
+
+                if ((nameMatch && statusMatch) || filteredChildren.length > 0) {
+                    if (filteredChildren.length > 0) {
+                        expandedIds.add(String(node.id));
+                    }
+                    result.push({ ...node, children: filteredChildren });
+                }
+            }
+            return result;
+        };
+
+        const tree = filterNodes(taskTree);
+        return { tree, expandedIds: Array.from(expandedIds) };
+    }, [taskTree, taskSearchTerm, taskStatusFilter]);
+
+    const prevSearchTerm = usePrevious(taskSearchTerm);
+    const prevStatusFilter = usePrevious(taskStatusFilter);
+
+    useEffect(() => {
+        // This effect now only runs when the filters themselves change.
+        // It no longer runs on a simple data refresh, which preserves the user's expanded state.
+        if (taskSearchTerm !== prevSearchTerm || taskStatusFilter !== prevStatusFilter) {
+            setExpandedNodes(filteredTaskTree.expandedIds);
+        }
+    }, [taskSearchTerm, taskStatusFilter, filteredTaskTree.expandedIds, prevSearchTerm, prevStatusFilter]);
+
     const handleStatusChange = async (taskId, newStatus) => {
         try {
-            await updateTaskStatus(taskId, newStatus);
+            const task = instance.tasks.find(t => t.id === taskId);
+            if (!task) {
+                console.error("Task not found:", taskId);
+                setError("An error occurred while updating the task.");
+                return;
+            }
+
+            // Call the service with the new status, preserving existing ticket and date info
+            await updateTaskStatus(
+                taskId, 
+                newStatus, 
+                task.ticket_info, 
+                task.ticket_created_at, 
+                task.ticket_closed_at
+            );
             fetchInstanceDetails();
         } catch (err) {
             setError('Failed to update task status.');
@@ -195,6 +247,18 @@ const OnboardingInstanceDetail = () => {
         } catch (err) {
             setError('Failed to delete onboarding instance.');
             console.error(err);
+        }
+    };
+
+    const handleUnassignTicket = async (taskId) => {
+        if (window.confirm('Are you sure you want to unassign this ticket? The task status will be reset.')) {
+            try {
+                await unassignTicket(taskId);
+                fetchInstanceDetails();
+            } catch (err) {
+                setError("Failed to unassign ticket.");
+                console.error("Unassign ticket error:", err);
+            }
         }
     };
 
@@ -315,23 +379,81 @@ const OnboardingInstanceDetail = () => {
     };
 
     const renderTree = (nodes) => (
-        nodes.map((node) => (
-            <TreeItem 
-                key={node.id}
-                itemId={String(node.id)}
-                label={
-                    <Box sx={{ display: 'flex', alignItems: 'center', p: 0.5 }}>
-                        {getStatusIcon(node.status)}
-                        <Typography sx={{ ml: 1, flexGrow: 1 }}>{node.name}</Typography>
-                        <Chip label={node.status} color={getStatusChipColor(node.status)} size="small" />
-                    </Box>
-                }
-            >
-                {Array.isArray(node.children) && node.children.length > 0
-                    ? renderTree(node.children)
-                    : null}
-            </TreeItem>
-        ))
+        nodes.map((node) => {
+            const isBlocked = blockedTasks.has(node.id);
+            const blockers = blockedTasks.get(node.id);
+            return (
+                <TreeItem 
+                    key={node.id}
+                    itemId={String(node.id)}
+                    label={
+                        <Box sx={{ display: 'flex', alignItems: 'center', p: 1, width: '100%', opacity: isBlocked ? 0.6 : 1 }}>
+                            {/* Left Side: Info */}
+                            <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}>
+                                {getStatusIcon(node.status)}
+                                <Box sx={{ ml: 1.5 }}>
+                                    <Typography>{node.name}</Typography>
+                                    {node.ticket_info?.key && (
+                                        <Typography variant="caption" color="text.secondary">
+                                            Ticket: <Link href={node.ticket_info.self} target="_blank" rel="noopener noreferrer">{node.ticket_info.key}</Link>
+                                        </Typography>
+                                    )}
+                                </Box>
+                                {node.instructions && (
+                                    <Tooltip title={node.instructions}>
+                                        <IconButton size="small" sx={{ ml: 1 }}><InfoOutlinedIcon fontSize="small" /></IconButton>
+                                    </Tooltip>
+                                )}
+                            </Box>
+
+                            {/* Right Side: Actions */}
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <FormControl size="small" sx={{ minWidth: 120 }} disabled={isBlocked}>
+                                    <Select
+                                        value={node.status}
+                                        onChange={(e) => handleStatusChange(node.id, e.target.value)}
+                                        renderValue={(selected) => (
+                                            <Chip label={selected} color={getStatusChipColor(selected)} size="small" />
+                                        )}
+                                    >
+                                        <MenuItem value="not_started">Not Started</MenuItem>
+                                        <MenuItem value="in_progress">In Progress</MenuItem>
+                                        <MenuItem value="completed">Completed</MenuItem>
+                                        <MenuItem value="blocked">Blocked</MenuItem>
+                                    </Select>
+                                </FormControl>
+
+                                {isBlocked && (
+                                    <Tooltip title={`Blocked by: ${blockers.join(', ')}`}>
+                                        <IconButton><LockIcon /></IconButton>
+                                    </Tooltip>
+                                )}
+                                <Tooltip title="View/Edit Ticket">
+                                    <IconButton onClick={() => handleOpenTicketModal(node)}><ConfirmationNumberIcon /></IconButton>
+                                </Tooltip>
+                                {node.ticket_info?.key && (
+                                    <Tooltip title="Unassign Ticket">
+                                        <IconButton onClick={() => handleUnassignTicket(node.id)}><LinkOffIcon /></IconButton>
+                                    </Tooltip>
+                                )}
+                                {node.task_type === 'automated_access_request' && node.status === 'not_started' && !isBlocked && (
+                                    <>
+                                        <Button variant="outlined" size="small" onClick={() => handleDryRun(node.id)} disabled={taskLoading === node.id}>Dry Run</Button>
+                                        <Button variant="contained" size="small" onClick={() => handleExecuteTask(node.id)} disabled={taskLoading === node.id}>
+                                            {taskLoading === node.id ? <CircularProgress size={20} /> : 'Run'}
+                                        </Button>
+                                    </>
+                                )}
+                            </Box>
+                        </Box>
+                    }
+                >
+                    {Array.isArray(node.children) && node.children.length > 0
+                        ? renderTree(node.children)
+                        : null}
+                </TreeItem>
+            );
+        })
     );
 
     if (loading) {
@@ -435,83 +557,59 @@ const OnboardingInstanceDetail = () => {
                 </Grid>
             </Box>
             
-            <Paper sx={{ mb: 2 }}>
-                <Box sx={{ display: 'flex', p: 1 }}>
-                    <Button 
-                        variant={activeTab === 'table' ? 'contained' : 'text'} 
-                        onClick={() => setActiveTab('table')}
-                        sx={{ mx: 1 }}
-                    >
-                        Table View
-                    </Button>
-                    <Button 
-                        variant={activeTab === 'timeline' ? 'contained' : 'text'} 
-                        onClick={() => setActiveTab('timeline')}
-                        sx={{ mx: 1 }}
-                        disabled
-                    >
-                        Timeline View
-                    </Button>
-                    <Button 
-                        variant={activeTab === 'kanban' ? 'contained' : 'text'} 
-                        onClick={() => setActiveTab('kanban')}
-                        sx={{ mx: 1 }}
-                    >
-                        Kanban View
-                    </Button>
-                    <Button 
-                        variant={activeTab === 'tree' ? 'contained' : 'text'} 
-                        onClick={() => setActiveTab('tree')}
-                        sx={{ mx: 1 }}
-                    >
-                        Tree View
-                    </Button>
+            <Paper sx={{ p: 2 }}>
+                <Box sx={{ display: 'flex', mb: 2, gap: 2 }}>
+                    <TextField
+                        variant="outlined"
+                        size="small"
+                        placeholder="Search tasks..."
+                        value={taskSearchTerm}
+                        onChange={(e) => setTaskSearchTerm(e.target.value)}
+                        sx={{ flexGrow: 1 }}
+                        InputProps={{
+                            startAdornment: (
+                                <InputAdornment position="start">
+                                    <SearchIcon />
+                                </InputAdornment>
+                            ),
+                        }}
+                    />
+                    <FormControl size="small" sx={{ minWidth: 150 }}>
+                        <InputLabel>Status</InputLabel>
+                        <Select
+                            value={taskStatusFilter}
+                            label="Status"
+                            onChange={(e) => setTaskStatusFilter(e.target.value)}
+                            startAdornment={
+                                <InputAdornment position="start">
+                                    <FilterListIcon />
+                                </InputAdornment>
+                            }
+                        >
+                            <MenuItem value="all">All Statuses</MenuItem>
+                            <MenuItem value="not_started">Not Started</MenuItem>
+                            <MenuItem value="in_progress">In Progress</MenuItem>
+                            <MenuItem value="completed">Completed</MenuItem>
+                            <MenuItem value="blocked">Blocked</MenuItem>
+                        </Select>
+                    </FormControl>
                 </Box>
-            </Paper>
-            
-            {activeTab === 'kanban' && (
-                <Grid container spacing={2}>
-                    {['not_started', 'in_progress', 'completed', 'blocked'].map(status => (
-                        <Grid item xs={12} md={3} key={status}>
-                            <Paper sx={{ p: 2, bgcolor: `${getStatusChipColor(status)}.lightest`, height: '100%' }}>
-                                <Typography variant="h6" gutterBottom sx={{ textTransform: 'capitalize' }}>{status.replace('_', ' ')}</Typography>
-                                <Divider sx={{ mb: 2 }} />
-                                <List>
-                                    {(tasksByStatus[status] || []).map(task => {
-                                        const isBlocked = blockedTasks.has(task.id);
-                                        return (
-                                            <ListItem
-                                                key={task.id}
-                                                component={Paper}
-                                                sx={{ mb: 1, opacity: isBlocked && status !== 'blocked' ? 0.6 : 1 }}
-                                            >
-                                                <ListItemIcon>
-                                                    {isBlocked && status !== 'blocked' ? <LockIcon color="error" /> : getStatusIcon(task.status)}
-                                                </ListItemIcon>
-                                                <ListItemText
-                                                    primary={task.name}
-                                                    secondary={task.task_type}
-                                                />
-                                            </ListItem>
-                                        );
-                                    })}
-                                </List>
-                            </Paper>
-                        </Grid>
-                    ))}
-                </Grid>
-            )}
-
-            {activeTab === 'tree' && (
-                <Paper sx={{ p: 2 }}>
+                <Divider sx={{ mb: 2 }} />
+                {filteredTaskTree.tree.length > 0 ? (
                     <SimpleTreeView
+                        expandedItems={expandedNodes}
+                        onExpandedItemsChange={(event, ids) => setExpandedNodes(ids)}
                         slots={{ collapseIcon: ExpandMoreIcon, expandIcon: ChevronRightIcon }}
                         sx={{ flexGrow: 1, overflowY: 'auto' }}
                     >
-                        {renderTree(taskTree)}
+                        {renderTree(filteredTaskTree.tree)}
                     </SimpleTreeView>
-                </Paper>
-            )}
+                ) : (
+                    <Typography sx={{ textAlign: 'center', p: 3, color: 'text.secondary' }}>
+                        No tasks match the current filters.
+                    </Typography>
+                )}
+            </Paper>
 
             <Dialog open={deleteDialogOpen} onClose={handleCloseDeleteDialog}>
                 <DialogTitle>Delete Onboarding Instance</DialogTitle>

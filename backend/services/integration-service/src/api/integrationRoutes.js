@@ -1,16 +1,14 @@
 import { Router } from 'express';
-import { getServiceDesks, getRequestTypes, getRequestTypeFields, createJiraTicket, getJiraTicket } from '../services/integrationService.js';
+import * as IntegrationService from '../services/integrationService.js';
 
 const router = Router();
 
-// --- Integration READ OPERATIONS ---
-
+// --- Jira Metadata Routes ---
 router.get('/:platform/servicedesks', async (req, res) => {
-    console.log(`[integrationRoutes] GET /${req.params.platform}/servicedesks handler reached.`);
     try {
         const { platform } = req.params;
         const { configKey } = req.query;
-        const serviceDesks = await getServiceDesks(platform, configKey);
+        const serviceDesks = await IntegrationService.getServiceDesks(platform, configKey);
         res.json(serviceDesks);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -21,7 +19,7 @@ router.get('/:platform/servicedesks/:serviceDeskId/requesttypes', async (req, re
     try {
         const { platform, serviceDeskId } = req.params;
         const { configKey } = req.query;
-        const requestTypes = await getRequestTypes(platform, configKey, serviceDeskId);
+        const requestTypes = await IntegrationService.getRequestTypes(platform, configKey, serviceDeskId);
         res.json(requestTypes);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -32,7 +30,7 @@ router.get('/:platform/servicedesks/:serviceDeskId/requesttypes/:requestTypeId/f
     try {
         const { platform, serviceDeskId, requestTypeId } = req.params;
         const { configKey } = req.query;
-        const fields = await getRequestTypeFields(platform, configKey, serviceDeskId, requestTypeId);
+        const fields = await IntegrationService.getRequestTypeFields(platform, configKey, serviceDeskId, requestTypeId);
         res.json(fields);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -40,27 +38,45 @@ router.get('/:platform/servicedesks/:serviceDeskId/requesttypes/:requestTypeId/f
 });
 
 router.get('/:platform/requests/:ticketKey', async (req, res) => {
-    console.log(`[integrationRoutes] Attempting to fetch ticket: ${req.params.ticketKey}`);
     try {
         const { platform, ticketKey } = req.params;
-        const ticketDetails = await getJiraTicket(platform, ticketKey);
-        console.log(`[integrationRoutes] Successfully fetched ticket: ${req.params.ticketKey}`);
+        const ticketDetails = await IntegrationService.getJiraTicket(platform, ticketKey);
         res.json(ticketDetails);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-// --- Integration WRITE OPERATIONS ---
 
-router.post('/:platform/requests', async (req, res) => {
+// --- Jira Action Routes ---
+
+router.post('/requests/create', async (req, res) => {
     try {
-        const { platform } = req.params;
-        const { configKey, serviceDeskId, requestTypeId, requestFieldValues } = req.body;
-        const result = await createJiraTicket(platform, configKey, serviceDeskId, requestTypeId, requestFieldValues);
+        const { jiraConfig, user } = req.body;
+        if (!jiraConfig || !user) {
+            return res.status(400).json({ error: 'Missing jiraConfig or user in request body.' });
+        }
+        const result = await IntegrationService.createJiraTicket(jiraConfig, user);
         res.status(201).json(result);
     } catch (error) {
         console.error("Jira Request Creation Error:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+router.post('/requests/dry-run', async (req, res) => {
+    try {
+        const { jiraConfig, user } = req.body;
+        if (!jiraConfig || !user) {
+            return res.status(400).json({ error: 'Missing jiraConfig or user in request body.' });
+        }
+        const result = await IntegrationService.prepareDryRunPayload(jiraConfig, user);
+        res.json({
+            message: "This is a dry run. The following payload would be sent to Jira.",
+            payload: result
+        });
+    } catch (error) {
+        console.error("Dry Run Error:", error);
         res.status(500).json({ error: error.message });
     }
 });

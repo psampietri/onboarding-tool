@@ -1,7 +1,11 @@
-// backend/services/onboarding-service/src/services/onboardingService.js
+import axios from 'axios';
 import * as OnboardingModel from '../models/onboardingModel.js';
-import * as IntegrationService from '../../../integration-service/src/services/integrationService.js';
 import * as UserService from '../../../user-service/src/services/userService.js';
+
+// This service now communicates with the integration service via HTTP.
+const integrationServiceApi = axios.create({
+    baseURL: 'http://localhost:5005', // URL of the integration service
+});
 
 export const createOnboardingInstance = async (instanceData) => {
     return await OnboardingModel.createOnboardingInstance(instanceData.userId, instanceData.templateId, instanceData.assignedBy);
@@ -27,7 +31,6 @@ export const updateTaskStatus = async (taskId, { status, ticketInfo, ticket_crea
 
     const fieldsToUpdate = { status };
 
-    // Set task_started_at only when moving to 'in_progress' for the first time
     if (status === 'in_progress' && !currentTask.task_started_at) {
         fieldsToUpdate.task_started_at = new Date().toISOString();
     }
@@ -43,7 +46,6 @@ export const updateTaskStatus = async (taskId, { status, ticketInfo, ticket_crea
         fieldsToUpdate.ticket_closed_at = ticket_closed_at;
     }
 
-    // Set task_completed_at if status is 'completed'
     if (status === 'completed') {
         fieldsToUpdate.task_completed_at = new Date().toISOString();
     }
@@ -57,20 +59,31 @@ export const executeAutomatedTask = async (taskId) => {
         throw new Error('Task is not an automated access request.');
     }
 
-    const startTime = new Date().toISOString();
-    await OnboardingModel.updateTaskInstance(taskId, { ticket_created_at: startTime, task_started_at: startTime, status: 'in_progress' });
-
     const user = await UserService.getUserById(task.user_id);
-    const result = await IntegrationService.createJiraTicket(task.config.jira, user);
     
-    const completionTime = new Date().toISOString();
-    const fieldsToUpdate = {
-        status: 'completed',
-        ticket_info: result,
-        task_completed_at: completionTime,
-        ticket_closed_at: completionTime
-    };
-    return await OnboardingModel.updateTaskInstance(taskId, fieldsToUpdate);
+    try {
+        // Make an HTTP call to the integration service to create the ticket
+        const response = await integrationServiceApi.post('/requests/create', {
+            jiraConfig: task.config.jira,
+            user: user
+        });
+        const result = response.data;
+        
+        // After successful ticket creation, update the task status to 'in progress'
+        // and save the ticket information.
+        const fieldsToUpdate = {
+            status: 'in_progress',
+            ticket_info: result,
+            ticket_created_at: new Date().toISOString(),
+            task_started_at: new Date().toISOString() // Also mark the task as started
+        };
+        return await OnboardingModel.updateTaskInstance(taskId, fieldsToUpdate);
+    } catch (error) {
+        console.error("Error calling integration service to create ticket:", error.response ? error.response.data : error.message);
+        // If the ticket creation fails, we should not leave the task in a broken state.
+        // Revert any changes or simply throw a more specific error.
+        throw new Error('Failed to create Jira ticket. Please check the integration service logs for details.');
+    }
 };
 
 export const dryRunAutomatedTask = async (taskId) => {
@@ -80,12 +93,14 @@ export const dryRunAutomatedTask = async (taskId) => {
     }
 
     const user = await UserService.getUserById(task.user_id);
-    const payload = IntegrationService.prepareJiraTicketPayload(task.config.jira, user);
 
-    return {
-        message: "This is a dry run. The following payload would be sent to Jira.",
-        payload: payload
-    };
+    // Make an HTTP call to the integration service for the dry run
+    const response = await integrationServiceApi.post('/requests/dry-run', {
+        jiraConfig: task.config.jira,
+        user: user
+    });
+    
+    return response.data;
 };
 
 export const updateOnboardingInstance = async (instanceId, data) => {
@@ -94,4 +109,17 @@ export const updateOnboardingInstance = async (instanceId, data) => {
 
 export const deleteOnboardingInstance = async (instanceId) => {
     return await OnboardingModel.deleteOnboardingInstance(instanceId);
+};
+
+export const unassignTicket = async (taskId) => {
+    const fieldsToUpdate = {
+        status: 'not_started',
+        ticket_info: null,
+        issue_key: null,
+        task_started_at: null,
+        task_completed_at: null,
+        ticket_created_at: null,
+        ticket_closed_at: null
+    };
+    return await OnboardingModel.updateTaskInstance(taskId, fieldsToUpdate);
 };

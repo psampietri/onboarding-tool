@@ -1,7 +1,14 @@
 import axios from 'axios';
 
 let jiraApi;
+// In-memory cache for Jira field schemas to avoid repeated API calls.
+const schemaCache = new Map();
 
+/**
+ * Initializes the Jira API client.
+ * @param {string} token - The Jira API token.
+ * @param {string} baseUrl - The base URL of the Jira instance.
+ */
 export const initJira = (token, baseUrl) => {
     if (!token || !baseUrl) {
         throw new Error('Jira API token and base URL are required.');
@@ -17,12 +24,17 @@ export const initJira = (token, baseUrl) => {
     console.log(`Jira integration initialized for base URL: ${baseUrl}`);
 };
 
+/**
+ * A robust, centralized function for making all Jira API calls.
+ * @param {string} endpoint - The API endpoint to call.
+ * @param {string} [method='GET'] - The HTTP method.
+ * @param {object|null} [payload=null] - The request payload.
+ * @returns {Promise<any>} The JSON response from the API.
+ */
 export const callJiraApi = async (endpoint, method = 'GET', payload = null) => {
     if (!jiraApi) {
         throw new Error('Jira API client has not been initialized. Call initJira() first.');
     }
-    // ADDED LOG: Announce the outgoing request to Jira
-    console.log(`[integration-service] Calling Jira API: ${method} ${jiraApi.defaults.baseURL}${endpoint}`);
     try {
         const options = {
             method,
@@ -32,17 +44,14 @@ export const callJiraApi = async (endpoint, method = 'GET', payload = null) => {
             options.data = payload;
         }
         const response = await jiraApi(options);
-        // ADDED LOG: Announce a successful response from Jira
-        console.log(`[integration-service] Success from Jira API for ${endpoint}. Status: ${response.status}`);
         return response.status === 204 ? { success: true } : response.data;
     } catch (error) {
         if (error.response) {
             console.error(`Jira API Error: ${error.response.status} calling ${endpoint}`, error.response.data);
             throw { status: error.response.status, data: error.response.data };
         } else if (error.request) {
-            // This block will be hit on a timeout
-            console.error(`Jira API Error: No response for ${endpoint}. Request timed out.`);
-            throw new Error(`Jira API request failed. No response received (timeout).`);
+            console.error(`Jira API Error: No response for ${endpoint}`, error.request);
+            throw new Error(`Jira API request failed. No response received.`);
         } else {
             console.error('Jira API Setup Error:', error.message);
             throw new Error(`Jira API setup error: ${error.message}`);
@@ -50,48 +59,73 @@ export const callJiraApi = async (endpoint, method = 'GET', payload = null) => {
     }
 };
 
-// ... (formatJiraPayload and getJiraIssueDetails functions remain the same)
+/**
+ * Fetches the field schema for a given request type, using a cache to improve performance.
+ * @param {string} serviceDeskId - The ID of the service desk.
+ * @param {string} requestTypeId - The ID of the request type.
+ * @returns {Promise<Map<string, object>>} A map of field IDs to their schemas.
+ */
+const getRequestTypeSchema = async (serviceDeskId, requestTypeId) => {
+    const cacheKey = `${serviceDeskId}-${requestTypeId}`;
+    if (schemaCache.has(cacheKey)) {
+        return schemaCache.get(cacheKey);
+    }
+
+    const response = await callJiraApi(`/rest/servicedeskapi/servicedesk/${serviceDeskId}/requesttype/${requestTypeId}/field`);
+    const fieldSchemas = new Map(response.requestTypeFields.map(field => [field.fieldId, field.jiraSchema]));
+    
+    schemaCache.set(cacheKey, fieldSchemas);
+    return fieldSchemas;
+};
 
 /**
- * Formats the payload for creating a Jira ticket based on template mappings.
- * This is adapted from the more comprehensive version in the access-request-automation tool.
+ * Formats the payload for creating a Jira ticket by using the dynamically fetched field schema.
+ * @param {string} serviceDeskId - The ID of the service desk.
+ * @param {string} requestTypeId - The ID of the request type.
  * @param {object} fieldMappings - The field mappings from the template.
  * @param {object} user - The user data.
- * @returns {object} The formatted requestFieldValues for the Jira API.
+ * @returns {Promise<object>} The formatted requestFieldValues for the Jira API.
  */
-export const formatJiraPayload = (fieldMappings, user) => {
+export const formatJiraPayload = async (serviceDeskId, requestTypeId, fieldMappings, user) => {
+    const fieldSchemas = await getRequestTypeSchema(serviceDeskId, requestTypeId);
     const requestFieldValues = {};
+    const isNumeric = (val) => val !== null && !isNaN(parseFloat(val)) && isFinite(String(val));
 
     for (const [fieldId, mapping] of Object.entries(fieldMappings)) {
-        let value = mapping.type === 'dynamic' ? user[mapping.value] : mapping.value;
+        const rawValue = mapping.type === 'dynamic' ? user[mapping.value] : mapping.value;
 
-        // Helper to check if a value is numeric
-        const isNumeric = (val) => val !== null && !isNaN(parseFloat(val)) && isFinite(val);
+        if (rawValue === undefined || rawValue === null) {
+            continue;
+        }
 
-        if (mapping.jiraSchema) {
-            const { type, items } = mapping.jiraSchema;
+        const schema = fieldSchemas.get(fieldId);
 
-            if (type === 'array' && items === 'user') {
-                requestFieldValues[fieldId] = Array.isArray(value) ? value.map(v => ({ name: v })) : [{ name: value }];
-            } else if (type === 'user') {
-                requestFieldValues[fieldId] = { name: value };
-            } else if (type === 'array' && items === 'option') {
-                const values = Array.isArray(value) ? value : [value];
-                requestFieldValues[fieldId] = values.map(v => (isNumeric(v) ? { id: v.toString() } : { value: v }));
+        if (schema) {
+            const { type, items } = schema;
+            if (type === 'array') {
+                const values = Array.isArray(rawValue) ? rawValue : [rawValue];
+                if (items === 'user') {
+                    requestFieldValues[fieldId] = values.map(v => ({ name: v }));
+                } else if (items === 'option') {
+                    requestFieldValues[fieldId] = values.map(v => (isNumeric(v) ? { id: String(v) } : { value: String(v) }));
+                } else {
+                    requestFieldValues[fieldId] = values; // Assumes array of strings for other types
+                }
             } else if (type === 'option') {
-                requestFieldValues[fieldId] = isNumeric(value) ? { id: value.toString() } : { value: value };
-            } else if (type === 'array') {
-                requestFieldValues[fieldId] = Array.isArray(value) ? value : [value];
+                requestFieldValues[fieldId] = isNumeric(rawValue) ? { id: String(rawValue) } : { value: String(rawValue) };
+            } else if (type === 'user') {
+                requestFieldValues[fieldId] = { name: rawValue };
             } else {
-                requestFieldValues[fieldId] = value;
+                requestFieldValues[fieldId] = rawValue;
             }
         } else {
-            // Fallback for older templates without a schema
-            requestFieldValues[fieldId] = value;
+            // Fallback for fields not described by the schema (less common)
+            requestFieldValues[fieldId] = rawValue;
         }
     }
     return requestFieldValues;
 };
+
 
 /**
  * Fetches Jira issue details, with a fallback from Service Desk API to the generic API.
